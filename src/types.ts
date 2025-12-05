@@ -9,6 +9,7 @@ export interface InputField {
 
 export interface CopilotFrontmatter {
   inputs?: InputField[];
+  context?: string | string[];  // Glob patterns for files to include
   before?: string | string[];
   after?: string | string[];
   model?:

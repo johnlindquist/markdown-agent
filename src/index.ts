@@ -4,7 +4,9 @@ import { parseCliArgs, mergeFrontmatter } from "./cli";
 import { runBeforeCommands, runAfterCommands, buildCopilotArgs, buildPrompt, runCopilot, slugify } from "./run";
 import { substituteTemplateVars, extractTemplateVars } from "./template";
 import { promptInputs, validateInputField } from "./inputs";
+import { resolveContextGlobs, formatContextAsXml, getContextStats } from "./context";
 import type { InputField } from "./types";
+import { dirname } from "path";
 
 /**
  * Read stdin if it's being piped (not a TTY)
@@ -91,11 +93,26 @@ async function main() {
     process.exit(0);
   }
 
+  // Resolve context globs and include file contents
+  let contextXml = "";
+  if (frontmatter.context) {
+    const cwd = dirname(filePath);
+    const contextFiles = await resolveContextGlobs(frontmatter.context, cwd);
+    if (contextFiles.length > 0) {
+      const stats = getContextStats(contextFiles);
+      console.log(`Context: ${stats.fileCount} files, ${stats.totalLines} lines`);
+      contextXml = formatContextAsXml(contextFiles);
+    }
+  }
+
   // Run before-commands
   const beforeResults = await runBeforeCommands(frontmatter.before);
 
-  // Build final body with stdin and appended text
+  // Build final body with context, stdin, and appended text
   let finalBody = body;
+  if (contextXml) {
+    finalBody = `${contextXml}\n\n${finalBody}`;
+  }
   if (stdinContent) {
     finalBody = `<stdin>\n${stdinContent}\n</stdin>\n\n${finalBody}`;
   }
