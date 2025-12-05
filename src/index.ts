@@ -9,8 +9,9 @@ import { extractOutput, isValidExtractMode, type ExtractMode } from "./extract";
 import { generateCacheKey, readCache, writeCache } from "./cache";
 import { validatePrerequisites, handlePrerequisiteFailure } from "./prerequisites";
 import { formatDryRun, toCommandList, type DryRunInfo } from "./dryrun";
+import { isRemoteUrl, fetchRemote, cleanupRemote, printRemoteWarning } from "./remote";
 import type { InputField } from "./types";
-import { dirname } from "path";
+import { dirname, resolve } from "path";
 
 /**
  * Read stdin if it's being piped (not a TTY)
@@ -39,10 +40,27 @@ async function main() {
     process.exit(1);
   }
 
-  const file = Bun.file(filePath);
+  // Handle remote URLs
+  let localFilePath = filePath;
+  let isRemote = false;
+  const originalUrl = filePath;
+
+  if (isRemoteUrl(filePath)) {
+    printRemoteWarning(filePath);
+
+    const remoteResult = await fetchRemote(filePath);
+    if (!remoteResult.success) {
+      console.error(`Failed to fetch remote file: ${remoteResult.error}`);
+      process.exit(1);
+    }
+    localFilePath = remoteResult.localPath!;
+    isRemote = true;
+  }
+
+  const file = Bun.file(localFilePath);
 
   if (!await file.exists()) {
-    console.error(`File not found: ${filePath}`);
+    console.error(`File not found: ${localFilePath}`);
     process.exit(1);
   }
 
@@ -109,7 +127,7 @@ async function main() {
   let contextXml = "";
   let contextFiles: ContextFile[] = [];
   if (frontmatter.context) {
-    const cwd = dirname(filePath);
+    const cwd = dirname(resolve(localFilePath));
     contextFiles = await resolveContextGlobs(frontmatter.context, cwd);
     if (contextFiles.length > 0) {
       const stats = getContextStats(contextFiles);
@@ -145,6 +163,11 @@ async function main() {
       templateVars: allTemplateVars,
     };
     console.log(formatDryRun(dryRunInfo));
+
+    // Cleanup remote file before exit
+    if (isRemote) {
+      await cleanupRemote(localFilePath);
+    }
     process.exit(0);
   }
 
@@ -197,6 +220,11 @@ async function main() {
 
   // Run after-commands with (possibly extracted) output piped to first command
   const afterResults = await runAfterCommands(frontmatter.after, outputForPipe);
+
+  // Cleanup remote temporary file
+  if (isRemote) {
+    await cleanupRemote(localFilePath);
+  }
 
   // Exit with copilot's exit code (or first failed after command)
   const failedAfter = afterResults.find(r => r.exitCode !== 0);
