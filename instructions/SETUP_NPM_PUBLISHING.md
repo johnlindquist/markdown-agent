@@ -1,7 +1,8 @@
 ---
 model: claude-sonnet-4
 silent: true
-allow-tool:
+copilot:
+  allowed-tools:
     - shell(mkdir:*)
     - shell(bun:*)
     - shell(git:*)
@@ -44,23 +45,3 @@ Set up npm Trusted Publishing with GitHub Actions for this project.
    - @semantic-release/git (commit CHANGELOG.md and package.json)
 
 3. **Install dependencies**:
-   ```bash
-   bun add -D semantic-release @semantic-release/changelog @semantic-release/git @semantic-release/npm
-   ```
-
-4. **Ensure package.json has**:
-   ```json
-   "publishConfig": {
-     "access": "public"
-   }
-   ```
-
-5. **Output instructions** for configuring npm Trusted Publisher:
-   - Go to https://www.npmjs.com/package/{package-name}/access
-   - Under Trusted Publishers → Connect a new publisher → GitHub
-   - Repository owner: {owner}
-   - Repository name: {repo}
-   - Workflow filename: release.yml
-   - Environment: (leave empty)
-
-Use conventional commits (feat:, fix:, etc.) to trigger releases.

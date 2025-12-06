@@ -4,6 +4,21 @@
  */
 
 import { BaseRunner, type RunContext, type RunResult, type RunnerName } from "./types";
+import { getRunnerPassthroughArgs, toArray } from "./flags";
+
+/**
+ * Keys explicitly handled by this runner (not passed through)
+ */
+const HANDLED_GEMINI_KEYS = new Set([
+  "sandbox",
+  "yolo",
+  "approval-mode",
+  "allowed-tools",
+  "extensions",
+  "resume",
+  "allowed-mcp-server-names",
+  "screen-reader",
+]);
 
 export class GeminiRunner extends BaseRunner {
   readonly name: RunnerName = "gemini";
@@ -17,111 +32,112 @@ export class GeminiRunner extends BaseRunner {
     const args: string[] = [];
     const geminiConfig = frontmatter.gemini || {};
 
+    // --- Universal Keys ---
+
     // Model
     if (frontmatter.model) {
       args.push("--model", this.mapModel(frontmatter.model));
     }
 
-    // Directory access (include-directories)
-    const addDir = frontmatter["add-dir"];
-    if (addDir) {
-      const dirs = Array.isArray(addDir) ? addDir : [addDir];
-      for (const dir of dirs) {
-        args.push("--include-directories", dir);
-      }
+    // Note: interactive mode is handled in run() via --prompt-interactive
+
+    // Resume/Continue session (universal)
+    if (frontmatter.continue || frontmatter.resume === true) {
+      args.push("--resume", "latest");
+    } else if (typeof frontmatter.resume === "string") {
+      args.push("--resume", frontmatter.resume);
     }
+
+    // Directory access (add-dir -> --include-directories)
+    for (const dir of toArray(frontmatter["add-dir"])) {
+      args.push("--include-directories", dir);
+    }
+
+    // God mode: allow-all-tools -> --yolo
+    if (frontmatter["allow-all-tools"] || geminiConfig.yolo) {
+      args.push("--yolo");
+    }
+
+    // Tool whitelist (universal)
+    for (const tool of toArray(frontmatter["allow-tool"])) {
+      args.push("--allowed-tools", tool);
+    }
+
+    // Note: Gemini doesn't support deny-tool
+
+    // Output format (universal)
+    if (frontmatter["output-format"]) {
+      args.push("--output-format", frontmatter["output-format"]);
+    }
+
+    // Debug
+    if (frontmatter.debug) {
+      args.push("--debug");
+    }
+
+    // --- Gemini-Specific Keys ---
 
     // Sandbox mode
     if (geminiConfig.sandbox) {
       args.push("--sandbox");
     }
 
-    // YOLO mode (allow-all-tools maps to this)
-    if (frontmatter["allow-all-tools"] || geminiConfig.yolo) {
-      args.push("--yolo");
-    }
-
-    // Approval mode
+    // Approval mode (more granular than yolo)
     if (geminiConfig["approval-mode"]) {
       args.push("--approval-mode", String(geminiConfig["approval-mode"]));
     }
 
-    // Allowed tools (array)
-    if (geminiConfig["allowed-tools"]) {
-      const tools = Array.isArray(geminiConfig["allowed-tools"])
-        ? geminiConfig["allowed-tools"]
-        : [geminiConfig["allowed-tools"]];
-      for (const tool of tools) {
-        args.push("--allowed-tools", String(tool));
-      }
+    // Gemini-specific allowed tools (in addition to universal)
+    for (const tool of toArray(geminiConfig["allowed-tools"] as string | string[])) {
+      args.push("--allowed-tools", tool);
     }
 
     // Extensions
-    if (geminiConfig.extensions) {
-      const exts = Array.isArray(geminiConfig.extensions)
-        ? geminiConfig.extensions
-        : [geminiConfig.extensions];
-      for (const ext of exts) {
-        args.push("--extensions", String(ext));
-      }
+    for (const ext of toArray(geminiConfig.extensions as string | string[])) {
+      args.push("--extensions", ext);
     }
 
-    // Resume session
-    if (geminiConfig.resume) {
+    // Resume from gemini-specific (in addition to universal)
+    if (geminiConfig.resume && !frontmatter.resume && !frontmatter.continue) {
       args.push("--resume", String(geminiConfig.resume));
     }
 
     // MCP servers
-    if (geminiConfig["allowed-mcp-server-names"]) {
-      const servers = Array.isArray(geminiConfig["allowed-mcp-server-names"])
-        ? geminiConfig["allowed-mcp-server-names"]
-        : [geminiConfig["allowed-mcp-server-names"]];
-      for (const server of servers) {
-        args.push("--allowed-mcp-server-names", String(server));
-      }
+    for (const server of toArray(geminiConfig["allowed-mcp-server-names"] as string | string[])) {
+      args.push("--allowed-mcp-server-names", server);
     }
 
-    // Output format for silent/script mode
-    if (frontmatter.silent && !frontmatter.interactive) {
-      args.push("--output-format", "text");
+    // Screen reader
+    if (geminiConfig["screen-reader"]) {
+      args.push("--screen-reader");
     }
 
-    // Passthrough any gemini-specific args from config
-    const handledKeys = new Set([
-      "sandbox", "yolo", "approval-mode", "allowed-tools",
-      "extensions", "resume", "allowed-mcp-server-names"
-    ]);
-    for (const [key, value] of Object.entries(geminiConfig)) {
-      if (handledKeys.has(key)) continue;
-      if (typeof value === "boolean" && value) {
-        args.push(`--${key}`);
-      } else if (typeof value === "string" || typeof value === "number") {
-        args.push(`--${key}`, String(value));
-      }
-    }
+    // --- Passthrough: any gemini-specific keys we didn't handle ---
+    args.push(...getRunnerPassthroughArgs(geminiConfig, HANDLED_GEMINI_KEYS));
 
-    // Passthrough args from CLI
+    // --- CLI passthrough args (highest priority) ---
     args.push(...ctx.passthroughArgs);
 
     return args;
   }
 
   /**
-   * Gemini uses positional prompt, not a flag
+   * Gemini uses positional prompt for one-shot, --prompt-interactive for REPL
    */
   async run(ctx: RunContext): Promise<RunResult> {
     const { frontmatter } = ctx;
     const command = this.getCommand();
     const args = this.buildArgs(ctx);
 
-    // For interactive mode, use --prompt-interactive
-    // Otherwise, use positional prompt (one-shot mode)
     let finalArgs: string[];
-    if (frontmatter.interactive) {
-      finalArgs = ["--prompt-interactive", ctx.prompt, ...args];
-    } else {
-      // Positional prompt comes at the end
+    // interactive: true (or undefined/default) -> --prompt-interactive for REPL
+    // interactive: false -> positional prompt (one-shot mode)
+    if (frontmatter.interactive === false) {
+      // Positional prompt comes at the end (one-shot, exits after)
       finalArgs = [...args, ctx.prompt];
+    } else {
+      // Interactive REPL mode with initial prompt
+      finalArgs = ["--prompt-interactive", ctx.prompt, ...args];
     }
 
     const proc = Bun.spawn([command, ...finalArgs], {
@@ -145,8 +161,8 @@ export class GeminiRunner extends BaseRunner {
    */
   private mapModel(model: string): string {
     const modelMap: Record<string, string> = {
-      "gemini": "gemini-2.5-pro",
-      "gemini-pro": "gemini-2.5-pro",
+      "gemini": "gemini-3-pro-preview",
+      "gemini-pro": "gemini-3-pro-preview",
       "gemini-flash": "gemini-2.5-flash",
       "gemini-2.5-pro": "gemini-2.5-pro",
       "gemini-2.5-flash": "gemini-2.5-flash",

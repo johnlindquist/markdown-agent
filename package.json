@@ -1,7 +1,12 @@
 {
   "name": "markdown-agent",
+  "version": "0.0.0",
   "module": "src/index.ts",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/johnlindquist/markdown-agent.git"
+  },
   "bin": {
     "markdown-agent": "./src/index.ts",
     "ma": "./src/index.ts"
@@ -11,8 +16,15 @@
     "ma": "bun run src/index.ts"
   },
   "devDependencies": {
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/commit-analyzer": "^13.0.1",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/github": "^12.0.2",
+    "@semantic-release/npm": "^13.1.2",
+    "@semantic-release/release-notes-generator": "^14.1.0",
     "@types/bun": "latest",
-    "@types/js-yaml": "^4.0.9"
+    "@types/js-yaml": "^4.0.9",
+    "semantic-release": "^25.0.2"
   },
   "peerDependencies": {
     "typescript": "^5"

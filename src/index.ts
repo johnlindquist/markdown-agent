@@ -14,6 +14,8 @@ import { isRemoteUrl, fetchRemote, cleanupRemote, printRemoteWarning } from "./r
 import { resolveRunnerSync, type RunContext } from "./runners";
 import { runBatch, formatBatchResults, parseBatchManifest } from "./batch";
 import { runSetup } from "./setup";
+import { offerRepair } from "./repair";
+import { expandImports, hasImports } from "./imports";
 import type { InputField } from "./types";
 import { dirname, resolve } from "path";
 
@@ -170,7 +172,42 @@ async function main() {
     process.exit(validation.success ? 0 : 1);
   }
 
-  const { frontmatter: baseFrontmatter, body: rawBody } = parseFrontmatter(content);
+  // Parse frontmatter with interactive repair on error
+  let baseFrontmatter;
+  let rawBody;
+  let currentContent = content;
+
+  while (true) {
+    try {
+      const parsed = parseFrontmatter(currentContent);
+      baseFrontmatter = parsed.frontmatter;
+      rawBody = parsed.body;
+      break;
+    } catch (err) {
+      const errorMessage = (err as Error).message;
+
+      // Extract validation errors for repair context
+      const errors = errorMessage.includes("Invalid frontmatter:")
+        ? errorMessage.replace("Invalid frontmatter:\n", "").split("\n").map(e => e.trim()).filter(Boolean)
+        : [errorMessage];
+
+      // Offer interactive repair
+      const shouldRetry = await offerRepair({
+        filePath: resolve(localFilePath),
+        content: currentContent,
+        errors,
+      });
+
+      if (!shouldRetry) {
+        // User declined repair or repair failed
+        console.error(`\n${errorMessage}`);
+        process.exit(1);
+      }
+
+      // Re-read the file after repair
+      currentContent = await Bun.file(localFilePath).text();
+    }
+  }
 
   // Handle wizard mode inputs
   let allTemplateVars = { ...templateVars };
@@ -196,8 +233,24 @@ async function main() {
     }
   }
 
+  // Expand @file imports and !`command` inlines in the body
+  const fileDir = dirname(resolve(localFilePath));
+  let expandedBody = rawBody;
+
+  if (hasImports(rawBody)) {
+    try {
+      expandedBody = await expandImports(rawBody, fileDir, new Set(), verbose);
+      if (verbose) {
+        console.error("[verbose] Imports expanded");
+      }
+    } catch (err) {
+      console.error(`Import error: ${(err as Error).message}`);
+      process.exit(1);
+    }
+  }
+
   // Check for missing template variables (after prompts)
-  const requiredVars = extractTemplateVars(rawBody);
+  const requiredVars = extractTemplateVars(expandedBody);
   const missingVars = requiredVars.filter(v => !(v in allTemplateVars));
   if (missingVars.length > 0) {
     console.error(`Missing template variables: ${missingVars.join(", ")}`);
@@ -206,7 +259,7 @@ async function main() {
   }
 
   // Apply template substitution to body
-  const body = substituteTemplateVars(rawBody, allTemplateVars);
+  const body = substituteTemplateVars(expandedBody, allTemplateVars);
 
   // Merge frontmatter with CLI overrides
   const frontmatter = mergeFrontmatter(baseFrontmatter, overrides);

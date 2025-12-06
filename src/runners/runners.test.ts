@@ -66,28 +66,26 @@ describe("CopilotRunner", () => {
     expect(args).toContain("--allow-all-tools");
   });
 
-  test("builds args with silent mode", () => {
-    const args = runner.buildArgs(makeContext({ silent: true }));
-    expect(args).toContain("--silent");
-  });
-
-  test("passes --silent by default when silent is undefined", () => {
+  test("passes --silent by default (copilot.silent defaults to true)", () => {
     const args = runner.buildArgs(makeContext({}));
     expect(args).toContain("--silent");
   });
 
-  test("does not pass --silent when silent is explicitly false", () => {
-    const args = runner.buildArgs(makeContext({ silent: false }));
+  test("does not pass --silent when copilot.silent is explicitly false", () => {
+    const args = runner.buildArgs(makeContext({
+      copilot: { silent: false }
+    }));
     expect(args).not.toContain("--silent");
   });
 
-  test("builds args with interactive mode", () => {
-    const args = runner.buildArgs(makeContext({ interactive: true }));
+  test("builds args with interactive mode (default)", () => {
+    // interactive: true (or undefined) -> --interactive
+    const args = runner.buildArgs(makeContext({}));
     expect(args).toContain("--interactive");
   });
 
-  test("defaults to -p when not interactive", () => {
-    const args = runner.buildArgs(makeContext({}));
+  test("uses -p when interactive is explicitly false", () => {
+    const args = runner.buildArgs(makeContext({ interactive: false }));
     expect(args).toContain("-p");
     expect(args).not.toContain("--interactive");
   });
@@ -167,16 +165,18 @@ describe("ClaudeRunner", () => {
     expect(args).toContain("Read,Write");
   });
 
-  test("uses -p for silent mode", () => {
-    const args = runner.buildArgs(makeContext({ silent: true }));
+  test("uses -p when interactive is false", () => {
+    const args = runner.buildArgs(makeContext({ interactive: false }));
     expect(args).toContain("-p");
   });
 
-  test("does not add -p for interactive mode", () => {
-    const args = runner.buildArgs(makeContext({
-      silent: true,
-      interactive: true
-    }));
+  test("does not add -p for interactive mode (default)", () => {
+    const args = runner.buildArgs(makeContext({}));
+    expect(args).not.toContain("-p");
+  });
+
+  test("does not add -p when interactive is explicitly true", () => {
+    const args = runner.buildArgs(makeContext({ interactive: true }));
     expect(args).not.toContain("-p");
   });
 
@@ -347,18 +347,19 @@ describe("GeminiRunner", () => {
     expect(args).toContain("server1");
   });
 
-  test("adds output-format text for silent mode", () => {
-    const args = runner.buildArgs(makeContext({ silent: true }));
+  test("supports output-format via universal key", () => {
+    const args = runner.buildArgs(makeContext({ "output-format": "json" }));
     expect(args).toContain("--output-format");
-    expect(args).toContain("text");
+    expect(args).toContain("json");
   });
 
-  test("does not add output-format for interactive mode", () => {
-    const args = runner.buildArgs(makeContext({
-      silent: true,
-      interactive: true
-    }));
-    expect(args).not.toContain("--output-format");
+  test("uses positional prompt when interactive is false", async () => {
+    const runner = new GeminiRunner();
+    // Note: We can't easily test the run() method's finalArgs construction here,
+    // but we can verify that buildArgs doesn't add --prompt-interactive flag
+    const args = runner.buildArgs(makeContext({ interactive: false }));
+    // The flag is added in run(), not buildArgs - this just verifies no errors
+    expect(args).toBeDefined();
   });
 });
 

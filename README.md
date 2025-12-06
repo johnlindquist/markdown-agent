@@ -96,6 +96,7 @@ The same agent can run on **Claude**, **Codex**, **Gemini**, or **Copilot**—ju
 - **Multi-Backend**: Claude, Codex, Gemini, Copilot with auto-detection
 - **Command Hooks**: Run shell commands before/after, pipe outputs
 - **Context Globs**: Include files by pattern (`src/**/*.ts`)
+- **Imports**: Inline files with `@./path.md` or commands with `` !`cmd` ``
 - **Wizard Mode**: Interactive prompts with `inputs:` field
 - **Output Extraction**: Extract JSON, code, or markdown
 - **Result Caching**: Cache expensive LLM calls
@@ -323,6 +324,71 @@ context:
 Review the TypeScript files above for potential issues.
 ```
 
+### Imports & Command Inlines
+
+Inline content from other files or command output directly in your prompts—like Claude Code's `@` imports.
+
+#### File Imports
+
+Use `@` followed by a path to inline file contents:
+
+```markdown
+---
+model: sonnet
+---
+Follow these coding standards:
+@~/.config/coding-standards.md
+
+Now review this code:
+@./src/api.ts
+```
+
+- `@~/path` - Expands `~` to home directory
+- `@./path` - Relative to current markdown file
+- `@/path` - Absolute path
+
+Imports are recursive—imported files can have their own `@` imports (with circular detection).
+
+#### Command Inlines
+
+Use `` !`command` `` to execute a shell command and inline its output:
+
+```markdown
+---
+model: sonnet
+---
+Current branch: !`git branch --show-current`
+Recent commits:
+!`git log --oneline -5`
+
+Based on the above, suggest what to work on next.
+```
+
+#### Combined Example
+
+```markdown
+---
+model: sonnet
+---
+# Code Review Request
+
+## Standards
+@~/.config/review-checklist.md
+
+## Current Changes
+!`git diff --cached`
+
+## Files Modified
+!`git diff --cached --name-only`
+
+Review the changes above against the standards.
+```
+
+This is powerful for:
+- **Shared prompts**: Keep common instructions in one file, import everywhere
+- **Dynamic context**: Include git status, environment info, or any command output
+- **Composable agents**: Build complex prompts from reusable pieces
+
 ## CLI Options
 
 ```
@@ -363,12 +429,13 @@ Examples:
 2. **Resolve Runner**: Determines backend from CLI flag, frontmatter, or model heuristic
 3. **Prerequisites**: Validates required binaries and environment variables
 4. **Context**: Resolves glob patterns and includes file contents
-5. **Inputs**: Prompts for wizard mode variables if defined
-6. **Before**: Runs `before` commands, captures output in XML tags
-7. **Execute**: Sends prompt to selected runner with mapped flags
-8. **Extract**: Optionally extracts JSON/code/markdown from response
-9. **After**: Pipes response to `after` commands
-10. **Cache**: Stores result if caching enabled
+5. **Imports**: Expands `@file` imports and `` !`cmd` `` inlines recursively
+6. **Inputs**: Prompts for wizard mode variables if defined
+7. **Before**: Runs `before` commands, captures output in XML tags
+8. **Execute**: Sends prompt to selected runner with mapped flags
+9. **Extract**: Optionally extracts JSON/code/markdown from response
+10. **After**: Pipes response to `after` commands
+11. **Cache**: Stores result if caching enabled
 
 ### Stdin Support
 

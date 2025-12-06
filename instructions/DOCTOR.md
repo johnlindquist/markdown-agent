@@ -42,7 +42,7 @@ You receive a JSON validation report via stdin with this structure:
 - Preserve the original body content exactly
 - Keep all valid frontmatter fields unchanged
 - For ambiguous model names, keep the original (model is a flexible string)
-- For truly invalid models with obvious intent (e.g., `chatgpt`), suggest `gpt-4o` for Codex
+- For truly invalid models with obvious intent (e.g., `chatgpt`), suggest `gpt-5` for Codex
 - Output ONLY the fixed markdown file content, no explanations
 
 ## Example

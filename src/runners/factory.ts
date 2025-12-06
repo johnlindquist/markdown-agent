@@ -23,8 +23,6 @@ const CLAUDE_MODELS = [
 ];
 
 const CODEX_MODELS = [
-  "o1",
-  "o3",
   "gpt-",
   "codex",
 ];

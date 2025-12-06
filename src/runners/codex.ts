@@ -4,6 +4,22 @@
  */
 
 import { BaseRunner, type RunContext, type RunResult, type RunnerName } from "./types";
+import { getRunnerPassthroughArgs, toArray } from "./flags";
+
+/**
+ * Keys explicitly handled by this runner (not passed through)
+ */
+const HANDLED_CODEX_KEYS = new Set([
+  "sandbox",
+  "approval",
+  "full-auto",
+  "oss",
+  "local-provider",
+  "cd",
+  "search",
+  "image",
+  "profile",
+]);
 
 export class CodexRunner extends BaseRunner {
   readonly name: RunnerName = "codex";
@@ -17,12 +33,36 @@ export class CodexRunner extends BaseRunner {
     const args: string[] = [];
     const codexConfig = frontmatter.codex || {};
 
-    // Model mapping
+    // --- Universal Keys ---
+
+    // Model
     if (frontmatter.model) {
       args.push("--model", this.mapModel(frontmatter.model));
     }
 
-    // Directory (cd into workspace)
+    // Note: interactive mode is handled in run() via exec subcommand
+
+    // Directory access (universal add-dir -> --add-dir for Codex)
+    for (const dir of toArray(frontmatter["add-dir"])) {
+      args.push("--add-dir", dir);
+    }
+
+    // God mode: allow-all-tools -> --full-auto
+    if (frontmatter["allow-all-tools"] || codexConfig["full-auto"]) {
+      args.push("--full-auto");
+    }
+
+    // Note: Codex doesn't support allow-tool/deny-tool granularity
+
+    // Debug (Codex doesn't have --debug, but we can try config)
+    if (frontmatter.debug) {
+      // Codex uses -c config overrides for debug
+      args.push("-c", "debug=true");
+    }
+
+    // --- Codex-Specific Keys ---
+
+    // Working directory
     if (codexConfig.cd) {
       args.push("--cd", String(codexConfig.cd));
     }
@@ -34,15 +74,10 @@ export class CodexRunner extends BaseRunner {
 
     // Approval policy
     if (codexConfig.approval) {
-      args.push("--approval", String(codexConfig.approval));
+      args.push("--ask-for-approval", String(codexConfig.approval));
     }
 
-    // Full auto mode (allow-all-tools maps to this)
-    if (frontmatter["allow-all-tools"] || codexConfig["full-auto"]) {
-      args.push("--full-auto");
-    }
-
-    // OSS mode (local models via Ollama etc)
+    // OSS mode (local models)
     if (codexConfig.oss) {
       args.push("--oss");
     }
@@ -52,36 +87,40 @@ export class CodexRunner extends BaseRunner {
       args.push("--local-provider", String(codexConfig["local-provider"]));
     }
 
-    // Passthrough any codex-specific args from config
-    for (const [key, value] of Object.entries(codexConfig)) {
-      // Skip already-handled keys
-      if (["sandbox", "approval", "full-auto", "oss", "local-provider", "cd"].includes(key)) {
-        continue;
-      }
-      // Pass through other keys as flags
-      if (typeof value === "boolean" && value) {
-        args.push(`--${key}`);
-      } else if (typeof value === "string" || typeof value === "number") {
-        args.push(`--${key}`, String(value));
-      }
+    // Web search
+    if (codexConfig.search) {
+      args.push("--search");
     }
 
-    // Passthrough args from CLI
+    // Image attachments
+    for (const img of toArray(codexConfig.image as string | string[])) {
+      args.push("--image", img);
+    }
+
+    // Profile
+    if (codexConfig.profile) {
+      args.push("--profile", String(codexConfig.profile));
+    }
+
+    // --- Passthrough: any codex-specific keys we didn't handle ---
+    args.push(...getRunnerPassthroughArgs(codexConfig, HANDLED_CODEX_KEYS));
+
+    // --- CLI passthrough args (highest priority) ---
     args.push(...ctx.passthroughArgs);
 
     return args;
   }
 
   /**
-   * For Codex, silent mode uses the exec subcommand for non-interactive output
+   * For Codex, non-interactive mode uses the exec subcommand
    */
   async run(ctx: RunContext): Promise<RunResult> {
     const { frontmatter } = ctx;
     const command = this.getCommand();
     const args = this.buildArgs(ctx);
 
-    // Silent mode uses exec subcommand
-    const finalArgs = frontmatter.silent && !frontmatter.interactive
+    // interactive: false -> use exec subcommand (run & exit)
+    const finalArgs = frontmatter.interactive === false
       ? ["exec", ...args, ctx.prompt]
       : [...args, ctx.prompt];
 
@@ -112,8 +151,6 @@ export class CodexRunner extends BaseRunner {
       "gpt-5.1-codex-mini": "gpt-5.1-codex-mini",
       "gpt-5-mini": "gpt-5-mini",
       "gpt-4.1": "gpt-4.1",
-      "o1": "o1",
-      "o3": "o3",
     };
     return modelMap[model] || model;
   }

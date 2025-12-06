@@ -4,12 +4,23 @@
  */
 
 import { BaseRunner, type RunContext, type RunResult, type RunnerName } from "./types";
+import { getRunnerPassthroughArgs, toArray } from "./flags";
 
-/** Keys that are explicitly handled and should be skipped in the generic pass-through loop */
+/**
+ * Keys explicitly handled by this runner (not passed through)
+ */
 const HANDLED_CLAUDE_KEYS = new Set([
   "dangerously-skip-permissions",
+  "permission-mode",
   "mcp-config",
-  "allowed-tools"
+  "strict-mcp-config",
+  "allowed-tools",
+  "disallowed-tools",
+  "system-prompt",
+  "append-system-prompt",
+  "betas",
+  "fork-session",
+  "ide",
 ]);
 
 /**
@@ -40,57 +51,118 @@ export class ClaudeRunner extends BaseRunner {
     const args: string[] = [];
     const claudeConfig = frontmatter.claude || {};
 
-    // Model mapping
+    // --- Universal Keys ---
+
+    // Model
     if (frontmatter.model) {
       args.push("--model", mapClaudeModel(frontmatter.model));
     }
 
-    // Directory access
-    const addDir = frontmatter["add-dir"];
-    if (addDir) {
-      const dirs = Array.isArray(addDir) ? addDir : [addDir];
-      for (const dir of dirs) {
-        args.push("--add-dir", dir);
-      }
+    // Interactive mode: false = -p (print mode, run & exit)
+    if (frontmatter.interactive === false) {
+      args.push("-p");
     }
 
-    // Permissions
+    // Resume/Continue session
+    if (frontmatter.continue || frontmatter.resume === true) {
+      args.push("-c");
+    } else if (typeof frontmatter.resume === "string") {
+      args.push("-r", frontmatter.resume);
+    }
+
+    // Directory access
+    for (const dir of toArray(frontmatter["add-dir"])) {
+      args.push("--add-dir", dir);
+    }
+
+    // God mode: allow-all-tools -> --dangerously-skip-permissions
     if (frontmatter["allow-all-tools"] || claudeConfig["dangerously-skip-permissions"]) {
       args.push("--dangerously-skip-permissions");
     }
+
+    // Tool whitelist (universal)
+    for (const tool of toArray(frontmatter["allow-tool"])) {
+      args.push("--allowed-tools", tool);
+    }
+
+    // Tool blacklist (universal)
+    for (const tool of toArray(frontmatter["deny-tool"])) {
+      args.push("--disallowed-tools", tool);
+    }
+
+    // MCP config (universal)
+    for (const config of toArray(frontmatter["mcp-config"])) {
+      args.push("--mcp-config", config);
+    }
+
+    // Output format
+    if (frontmatter["output-format"]) {
+      args.push("--output-format", frontmatter["output-format"]);
+    }
+
+    // Debug
+    if (frontmatter.debug === true) {
+      args.push("--debug");
+    } else if (typeof frontmatter.debug === "string") {
+      args.push("--debug", frontmatter.debug);
+    }
+
+    // --- Claude-Specific Keys ---
+
+    // Permission mode (more granular than god mode)
+    if (claudeConfig["permission-mode"]) {
+      args.push("--permission-mode", String(claudeConfig["permission-mode"]));
+    }
+
+    // Claude-specific allowed-tools (pattern syntax)
     if (claudeConfig["allowed-tools"]) {
       args.push("--allowed-tools", String(claudeConfig["allowed-tools"]));
     }
 
-    // MCP config
-    const mcpConfig = claudeConfig["mcp-config"];
-    if (mcpConfig) {
-      const configs = Array.isArray(mcpConfig) ? mcpConfig : [mcpConfig];
-      for (const config of configs) {
-        args.push("--mcp-config", String(config));
-      }
+    // Claude-specific disallowed-tools
+    if (claudeConfig["disallowed-tools"]) {
+      args.push("--disallowed-tools", String(claudeConfig["disallowed-tools"]));
     }
 
-    // Mode: silent maps to -p (print mode), interactive is default TTY
-    if (frontmatter.silent && !frontmatter.interactive) {
-      args.push("-p");  // Print mode - non-interactive
+    // MCP config from claude-specific (in addition to universal)
+    for (const config of toArray(claudeConfig["mcp-config"] as string | string[])) {
+      args.push("--mcp-config", config);
     }
 
-    // Passthrough any claude-specific args from config
-    for (const [key, value] of Object.entries(claudeConfig)) {
-      // Skip already-handled keys
-      if (HANDLED_CLAUDE_KEYS.has(key)) {
-        continue;
-      }
-      // Pass through other keys as flags
-      if (typeof value === "boolean" && value) {
-        args.push(`--${key}`);
-      } else if (typeof value === "string" || typeof value === "number") {
-        args.push(`--${key}`, String(value));
-      }
+    // Strict MCP config
+    if (claudeConfig["strict-mcp-config"]) {
+      args.push("--strict-mcp-config");
     }
 
-    // Passthrough args from CLI
+    // System prompt
+    if (claudeConfig["system-prompt"]) {
+      args.push("--system-prompt", String(claudeConfig["system-prompt"]));
+    }
+
+    // Append system prompt
+    if (claudeConfig["append-system-prompt"]) {
+      args.push("--append-system-prompt", String(claudeConfig["append-system-prompt"]));
+    }
+
+    // Beta headers
+    for (const beta of toArray(claudeConfig.betas as string | string[])) {
+      args.push("--betas", beta);
+    }
+
+    // Fork session
+    if (claudeConfig["fork-session"]) {
+      args.push("--fork-session");
+    }
+
+    // IDE integration
+    if (claudeConfig.ide) {
+      args.push("--ide");
+    }
+
+    // --- Passthrough: any claude-specific keys we didn't handle ---
+    args.push(...getRunnerPassthroughArgs(claudeConfig, HANDLED_CLAUDE_KEYS));
+
+    // --- CLI passthrough args (highest priority) ---
     args.push(...ctx.passthroughArgs);
 
     return args;
