@@ -1,3 +1,10 @@
+# [2.1.0](https://github.com/johnlindquist/markdown-agent/compare/v2.0.0...v2.1.0) (2025-12-06)
+
+
+### Features
+
+* **docs:** add docs: frontmatter key for external documentation via into.md ([c7a7d7a](https://github.com/johnlindquist/markdown-agent/commit/c7a7d7ab2ab70027a7b3a4127160310374d0baf2))
+
 # [2.0.0](https://github.com/johnlindquist/markdown-agent/compare/v1.0.0...v2.0.0) (2025-12-06)
 
 
