@@ -6,6 +6,7 @@ import { runBeforeCommands, runAfterCommands, buildPrompt, slugify } from "./run
 import { substituteTemplateVars, extractTemplateVars } from "./template";
 import { promptInputs, validateInputField } from "./inputs";
 import { resolveContextGlobs, formatContextAsXml, getContextStats, type ContextFile } from "./context";
+import { fetchDocs, getDocsStats, type DocsFetchResult } from "./docs";
 import { extractOutput, isValidExtractMode, type ExtractMode } from "./extract";
 import { generateCacheKey, readCache, writeCache } from "./cache";
 import { validatePrerequisites, handlePrerequisiteFailure } from "./prerequisites";
@@ -286,13 +287,36 @@ async function main() {
     contextFiles = await resolveContextGlobs(frontmatter.context, cwd);
     if (contextFiles.length > 0) {
       const stats = getContextStats(contextFiles);
-      console.log(`Context: ${stats.fileCount} files, ${stats.totalLines} lines`);
+      console.error(`Context: ${stats.fileCount} files, ${stats.totalLines} lines`);
       contextXml = formatContextAsXml(contextFiles);
     }
   }
 
-  // Build final body with context, stdin, and appended text
+  // Fetch external documentation via into.md
+  let docsXml = "";
+  let docsResults: DocsFetchResult[] = [];
+  if (frontmatter.docs) {
+    const docsContext = await fetchDocs(frontmatter.docs, verbose);
+    docsResults = docsContext.results;
+    docsXml = docsContext.xml;
+
+    if (docsResults.length > 0) {
+      const stats = getDocsStats(docsResults);
+      console.error(`Docs: ${stats.successful}/${stats.total} fetched, ${Math.round(stats.totalChars / 1000)}k chars`);
+      if (stats.failed > 0) {
+        const failed = docsResults.filter(r => !r.success);
+        for (const f of failed) {
+          console.error(`  ⚠ Failed: ${f.url} - ${f.error}`);
+        }
+      }
+    }
+  }
+
+  // Build final body with docs, context, stdin, and appended text
   let finalBody = body;
+  if (docsXml) {
+    finalBody = `${docsXml}\n\n${finalBody}`;
+  }
   if (contextXml) {
     finalBody = `${contextXml}\n\n${finalBody}`;
   }
@@ -312,6 +336,9 @@ async function main() {
     console.error(`[verbose] Model: ${frontmatter.model || "(default)"}`);
     if (contextFiles.length > 0) {
       console.error(`[verbose] Context files: ${contextFiles.length}`);
+    }
+    if (docsResults.length > 0) {
+      console.error(`[verbose] Docs URLs: ${docsResults.length}`);
     }
     if (passthroughArgs.length > 0) {
       console.error(`[verbose] Passthrough args: ${passthroughArgs.join(" ")}`);
