@@ -71,6 +71,16 @@ describe("CopilotRunner", () => {
     expect(args).toContain("--silent");
   });
 
+  test("passes --silent by default when silent is undefined", () => {
+    const args = runner.buildArgs(makeContext({}));
+    expect(args).toContain("--silent");
+  });
+
+  test("does not pass --silent when silent is explicitly false", () => {
+    const args = runner.buildArgs(makeContext({ silent: false }));
+    expect(args).not.toContain("--silent");
+  });
+
   test("builds args with interactive mode", () => {
     const args = runner.buildArgs(makeContext({ interactive: true }));
     expect(args).toContain("--interactive");
@@ -207,7 +217,7 @@ describe("CodexRunner", () => {
     const args = runner.buildArgs(makeContext({
       codex: { approval: "on-failure" }
     }));
-    expect(args).toContain("--approval");
+    expect(args).toContain("--ask-for-approval");
     expect(args).toContain("on-failure");
   });
 
@@ -267,7 +277,7 @@ describe("GeminiRunner", () => {
   test("maps gemini model names", () => {
     const args = runner.buildArgs(makeContext({ model: "gemini-pro" }));
     expect(args).toContain("--model");
-    expect(args).toContain("gemini-2.5-pro");
+    expect(args).toContain("gemini-3-pro-preview");
   });
 
   test("builds args with include-directories (add-dir)", () => {
@@ -366,8 +376,6 @@ describe("detectRunnerFromModel", () => {
     expect(detectRunnerFromModel("gpt-5")).toBe("codex");
     expect(detectRunnerFromModel("gpt-5.1")).toBe("codex");
     expect(detectRunnerFromModel("gpt-5.1-codex")).toBe("codex");
-    expect(detectRunnerFromModel("o1")).toBe("codex");
-    expect(detectRunnerFromModel("o3")).toBe("codex");
     expect(detectRunnerFromModel("codex")).toBe("codex");
   });
 

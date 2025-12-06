@@ -271,8 +271,8 @@ Options:
   --runner, -r <runner>   Select backend: claude, codex, copilot, gemini (default: auto)
   --model, -m <model>     Override AI model
   --agent <agent>         Override custom agent (copilot)
-  --silent, -s            Enable silent mode (non-interactive)
-  --no-silent             Disable silent mode
+  --silent, -s            Suppress session metadata output (default: on)
+  --no-silent             Show session metadata output
   --interactive, -i       Enable interactive mode
   --allow-all-tools       Allow all tools without confirmation
   --allow-all-paths       Allow access to any file path
@@ -317,7 +317,7 @@ Examples:
   DEMO.md "focus on error handling"
   DEMO.md --runner claude --model sonnet
   DEMO.md --runner codex --model gpt-5
-  DEMO.md --runner gemini --model gemini-2.5-pro
+  DEMO.md --runner gemini --model gemini-3-pro-preview
   DEMO.md -- --verbose --debug
 `);
 }

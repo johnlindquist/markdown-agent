@@ -42,7 +42,9 @@ export class CopilotRunner extends BaseRunner {
     if (frontmatter["deny-tool"]) {
       args.push("--deny-tool", frontmatter["deny-tool"]);
     }
-    if (frontmatter.silent) {
+    // Copilot's --silent suppresses session metadata in -p mode
+    // Default to passing --silent unless explicitly set to false
+    if (frontmatter.silent !== false) {
       args.push("--silent");
     }
     if (frontmatter["allow-all-tools"]) {

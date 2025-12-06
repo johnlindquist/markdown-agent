@@ -71,7 +71,7 @@ model: sonnet              # Claude Sonnet
 runner: gemini             # Or force Gemini
 context: ["src/**/*.ts"]   # Include files
 before: git diff           # Run command first
-silent: true               # Non-interactive
+silent: true               # Suppress session metadata
 ---
 ```
 
@@ -151,7 +151,7 @@ When no `runner` is specified, markdown-agent detects the appropriate backend fr
 | Model Pattern | Detected Runner |
 |---------------|-----------------|
 | `claude-*`, `sonnet`, `opus`, `haiku` | `claude` |
-| `gpt-*`, `o1`, `o3`, `codex` | `codex` |
+| `gpt-*`, `codex` | `codex` |
 | `gemini-*` | `gemini` |
 | (fallback) | `copilot` |
 
@@ -163,7 +163,7 @@ When no `runner` is specified, markdown-agent detects the appropriate backend fr
 |-------|------|-------------|
 | `runner` | string | Backend: `claude`, `codex`, `gemini`, `copilot`, `auto` |
 | `model` | string | AI model name |
-| `silent` | boolean | Non-interactive mode (default: true) |
+| `silent` | boolean | Suppress session metadata (default: true) |
 | `interactive` | boolean | Force TTY session |
 | `allow-all-tools` | boolean | Maps to each backend's "god mode" |
 | `allow-all-paths` | boolean | Allow any file path |
@@ -331,8 +331,8 @@ Usage: <file.md> [text] [options] [-- passthrough-args]
 Options:
   --runner, -r <runner>   Select backend: claude, codex, copilot, gemini
   --model, -m <model>     Override AI model
-  --silent, -s            Enable silent mode
-  --no-silent             Disable silent mode
+  --silent, -s            Suppress session metadata (default: on)
+  --no-silent             Show session metadata
   --interactive, -i       Enable interactive mode
   --allow-all-tools       Allow all tools without confirmation
   --allow-all-paths       Allow access to any file path
@@ -386,7 +386,46 @@ ma https://example.com/task.md
 
 ## Validation & Repair
 
-markdown-agent includes a Unix-pipe-friendly validation system. Use `--check` to validate frontmatter without executing, and `--json` to get machine-readable output for piping to repair agents.
+markdown-agent includes intelligent error handling. When frontmatter validation fails, you get an interactive repair experience instead of a crash.
+
+### Interactive Auto-Repair
+
+When you run an agent with invalid frontmatter, markdown-agent catches the error and offers to fix it:
+
+```
+$ BROKEN.md
+
+┌─────────────────────────────────────────────────────────┐
+│  ❌ Frontmatter Validation Error                        │
+└─────────────────────────────────────────────────────────┘
+
+Errors detected:
+  • allow-tool: Invalid input: expected string, received array
+
+? Would you like to auto-repair this file? (Y/n) Y
+? Select an AI to fix the file:
+  🟣 Claude (Anthropic)
+  🟢 Codex (OpenAI)
+  🔵 Gemini (Google)
+  ⚫ Copilot (GitHub)
+  ❌ Cancel
+
+🔧 Repairing with claude...
+
+✅ File repaired: /path/to/BROKEN.md
+? Run the agent now? (Y/n) Y
+```
+
+The repair flow:
+1. Detects validation errors at runtime
+2. Shows available AI runners on your system
+3. Sends error context + valid schema to chosen AI
+4. Writes the fixed file back
+5. Optionally re-runs the agent immediately
+
+### Manual Validation (CI/Scripts)
+
+For non-interactive use (CI pipelines, scripts), use `--check`:
 
 ### Human-Readable Validation
 
@@ -511,7 +550,7 @@ When `branch` is specified:
 
 ```markdown
 ---
-model: o1-preview
+model: gpt-5
 extract: json
 silent: true
 ---
@@ -772,5 +811,5 @@ Focus on: what it does, why it's designed this way, and any gotchas.
 - If no frontmatter is present, the file is printed as-is
 - `before` command output is wrapped in XML tags named after the command
 - The first `after` command receives AI output via stdin
-- Default `silent: true` suppresses interactive prompts
+- Default `silent: true` suppresses session metadata output
 - Use `--dry-run` to audit remote scripts before execution
