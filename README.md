@@ -1,47 +1,106 @@
 # markdown-agent
 
-**Think in Markdown. Execute Markdown Agents.**
+```bash
+REVIEW.md                        # Run a code review
+COMMIT.md "fix auth bug"         # Generate a commit message
+git diff | EXPLAIN.md            # Pipe anything through AI
+PLAN.md | IMPLEMENT.md           # Chain agents together
+```
 
-A multi-backend CLI tool for executable markdown prompts. Run the same `.md` file against **Claude Code**, **OpenAI Codex**, **Google Gemini**, or **GitHub Copilot** by combining YAML frontmatter with markdown content.
+**Your markdown files are now executable AI agents.**
 
-## Philosophy: Markdown as the Universal Agent Format
+---
 
-The best AI workflows start with markdown. Why?
+## What Is This?
 
-- **Readable**: Anyone can read and understand what an agent does
-- **Versionable**: Track changes in git like any other code
-- **Shareable**: Send a `.md` file to a colleague—no setup required
-- **Portable**: Run the same agent on Claude today, Gemini tomorrow
-- **Composable**: Pipe agents together like Unix commands
+Markdown files become first-class CLI commands. Write a prompt in markdown, run it like a script. No wrappers, no prefixes—just the filename.
 
-**For the best experience:** Create a directory of markdown agents and add it to your PATH. Your agents become available everywhere, just like any other CLI tool.
+```markdown
+# REVIEW.md
+---
+model: sonnet
+context: ["src/**/*.ts"]
+---
+Review this code for bugs and suggest improvements.
+```
 
 ```bash
-# Create your agents directory
-mkdir -p ~/agents
-cd ~/agents
-
-# Add to PATH in ~/.zshrc
-export PATH="$HOME/agents:$PATH"
-
-# Now any agent is runnable from anywhere
-REVIEW.md                    # Run code review agent
-COMMIT.md "fix auth bug"     # Generate commit message
-REFACTOR.md --model opus     # Refactor with specific model
+REVIEW.md                        # Runs Claude with your codebase
+REVIEW.md --model opus           # Override the model
+REVIEW.md --runner gemini        # Switch to Gemini instead
 ```
+
+---
+
+## How It Works
+
+**Three things make markdown executable:**
+
+### 1. Zsh Suffix Aliases (The Magic)
+
+Zsh can associate file extensions with commands. When you type `TASK.md`, zsh sees the `.md` suffix and routes it to `markdown-agent`:
+
+```bash
+ma --setup   # One-time setup, adds to ~/.zshrc
+```
+
+### 2. A Directory of Agents on PATH
+
+Put your agents in `~/agents` and add it to PATH. Now they're available everywhere:
+
+```bash
+~/agents/
+├── REVIEW.md      # Code review
+├── COMMIT.md      # Commit messages
+├── EXPLAIN.md     # Explain code
+├── TEST.md        # Generate tests
+└── DEPLOY.md      # Your deploy workflow
+```
+
+```bash
+export PATH="$HOME/agents:$PATH"   # Add to ~/.zshrc
+```
+
+### 3. Frontmatter Links to Models
+
+YAML frontmatter at the top of each file controls which AI runs and how:
+
+```yaml
+---
+model: sonnet              # Claude Sonnet
+runner: gemini             # Or force Gemini
+context: ["src/**/*.ts"]   # Include files
+before: git diff           # Run command first
+silent: true               # Non-interactive
+---
+```
+
+The same agent can run on **Claude**, **Codex**, **Gemini**, or **Copilot**—just change the model or runner.
+
+---
+
+## Why Markdown?
+
+| | |
+|---|---|
+| **Readable** | Anyone can understand what an agent does |
+| **Versionable** | Track changes in git like code |
+| **Shareable** | Send a `.md` file—no setup required |
+| **Portable** | Claude today, Gemini tomorrow |
+| **Composable** | Pipe agents like Unix commands |
+
+---
 
 ## Key Features
 
-- **Executable Markdown**: Your prompts are documentation. Your documentation is executable.
-- **Multi-Backend Support**: Run prompts on Claude, Codex, Gemini, or Copilot with automatic backend detection
-- **Agent Directories**: Keep agents on PATH for system-wide availability
-- **Command Hooks**: Run shell commands before/after AI execution with output piping
-- **Remote Execution**: Run prompts directly from URLs (like `npx`)
-- **Wizard Mode**: Interactive input prompts with templates
-- **Context Globs**: Include files by glob patterns
-- **Output Extraction**: Extract JSON, code blocks, or markdown from responses
+- **Multi-Backend**: Claude, Codex, Gemini, Copilot with auto-detection
+- **Command Hooks**: Run shell commands before/after, pipe outputs
+- **Context Globs**: Include files by pattern (`src/**/*.ts`)
+- **Wizard Mode**: Interactive prompts with `inputs:` field
+- **Output Extraction**: Extract JSON, code, or markdown
 - **Result Caching**: Cache expensive LLM calls
-- **Dry-Run Mode**: Audit what would run before executing
+- **Batch Mode**: Run parallel agents with git worktree isolation
+- **Remote Execution**: Run agents from URLs (like `npx`)
 
 ## Installation
 
