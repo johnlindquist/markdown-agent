@@ -1,4 +1,4 @@
-# md-agent
+# markdown-agent
 
 A multi-backend CLI tool for executable markdown prompts. Run the same `.md` file against **Claude Code**, **OpenAI Codex**, **Google Gemini**, or **GitHub Copilot** by combining YAML frontmatter with markdown content.
 
@@ -17,34 +17,37 @@ A multi-backend CLI tool for executable markdown prompts. Run the same `.md` fil
 ## Installation
 
 ```bash
-bun install
-bun link
+npm install -g markdown-agent
+# or
+bun install && bun link
 ```
 
 ## Quick Start
 
 ```bash
 # Auto-detect backend from model
-md-agent task.md --model sonnet           # Uses Claude
-md-agent task.md --model gpt-5            # Uses Codex
-md-agent task.md --model gemini-2.5-pro   # Uses Gemini
+ma task.md --model sonnet           # Uses Claude
+ma task.md --model gpt-5            # Uses Codex
+ma task.md --model gemini-2.5-pro   # Uses Gemini
 
 # Explicit backend selection
-md-agent task.md --runner claude
-md-agent task.md --runner codex
-md-agent task.md --runner gemini
-md-agent task.md --runner copilot
+ma task.md --runner claude
+ma task.md --runner codex
+ma task.md --runner gemini
+ma task.md --runner copilot
 
 # Dry-run to see what would execute
-md-agent task.md --dry-run
+ma task.md --dry-run
 
 # Run from URL
-md-agent https://example.com/task.md
+ma https://example.com/task.md
 ```
+
+> **Note:** Both `ma` and `markdown-agent` commands are available.
 
 ## Runner Architecture
 
-md-agent uses a **Runner Pattern** to normalize execution across backends. Each runner maps universal frontmatter to backend-specific CLI flags.
+markdown-agent uses a **Runner Pattern** to normalize execution across backends. Each runner maps universal frontmatter to backend-specific CLI flags.
 
 | Runner | CLI | God Mode Flag | Notes |
 |--------|-----|---------------|-------|
@@ -55,7 +58,7 @@ md-agent uses a **Runner Pattern** to normalize execution across backends. Each 
 
 ### Auto-Detection
 
-When no `runner` is specified, md-agent detects the appropriate backend from the model name:
+When no `runner` is specified, markdown-agent detects the appropriate backend from the model name:
 
 | Model Pattern | Detected Runner |
 |---------------|-----------------|
@@ -250,6 +253,8 @@ Options:
   --add-dir <dir>         Add directory to allowed list
   --no-cache              Skip cache and force fresh execution
   --dry-run               Show what would be executed
+  --check                 Validate frontmatter without executing
+  --json                  Output validation as JSON (with --check)
   --help, -h              Show help
 
 Passthrough:
@@ -279,15 +284,83 @@ Examples:
 ### Stdin Support
 
 ```bash
-cat file.txt | md-agent PROMPT.md
+cat file.txt | ma PROMPT.md
 # Prompt receives: <stdin>file contents</stdin>\n\nPrompt body
 ```
 
 ### Remote Execution
 
 ```bash
-md-agent https://example.com/task.md
+ma https://example.com/task.md
 # Downloads, validates, and executes (use --dry-run first!)
+```
+
+## Validation & Repair
+
+markdown-agent includes a Unix-pipe-friendly validation system. Use `--check` to validate frontmatter without executing, and `--json` to get machine-readable output for piping to repair agents.
+
+### Human-Readable Validation
+
+```bash
+ma --check task.md
+# ✅ task.md is valid
+
+ma --check broken.md
+# ❌ broken.md has errors:
+#    - inputs.0.type: Invalid enum value
+```
+
+### JSON Output for Piping
+
+```bash
+ma --check task.md --json
+```
+
+Output:
+```json
+{
+  "valid": false,
+  "file": "task.md",
+  "errors": ["inputs.0.type: Invalid enum value"],
+  "content": "---\ninputs:\n  - name: x\n    type: string\n..."
+}
+```
+
+### The Doctor Agent (Auto-Repair)
+
+Pipe validation output to the DOCTOR agent for automatic fixes:
+
+```bash
+# Validate, fix, and save in one pipeline
+ma --check broken.md --json | ma instructions/DOCTOR.md > fixed.md
+
+# Preview the fix without saving
+ma --check broken.md --json | ma instructions/DOCTOR.md
+```
+
+The Doctor agent:
+- Reads the JSON validation report from stdin
+- Fixes common schema violations (invalid types, missing fields)
+- Outputs the complete corrected markdown file
+
+### Project-Wide Linting
+
+Validate all markdown files in a directory:
+
+```bash
+# Check all instruction files
+for f in instructions/*.md; do
+  ma --check "$f" || echo "FAILED: $f"
+done
+
+# Fix all broken files
+for f in instructions/*.md; do
+  if ! ma --check "$f" --json > /dev/null 2>&1; then
+    ma --check "$f" --json | ma instructions/DOCTOR.md > "${f}.fixed"
+    mv "${f}.fixed" "$f"
+    echo "Fixed: $f"
+  fi
+done
 ```
 
 ## Zsh Suffix Alias

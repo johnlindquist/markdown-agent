@@ -9,8 +9,11 @@ export interface CliArgs {
   templateVars: TemplateVars;
   noCache: boolean;
   dryRun: boolean;
+  verbose: boolean;
   runner?: RunnerName;
   passthroughArgs: string[];
+  check: boolean;
+  json: boolean;
 }
 
 /** Known CLI flags that shouldn't be treated as template variables */
@@ -27,7 +30,10 @@ export const KNOWN_FLAGS = new Set([
   "--help", "-h",
   "--dry-run",
   "--no-cache",
+  "--verbose", "-v",
   "--runner", "-r",
+  "--check",
+  "--json",
   "--",  // Passthrough separator
 ]);
 
@@ -44,8 +50,11 @@ export function parseCliArgs(argv: string[]): CliArgs {
   const passthroughArgs: string[] = [];
   let noCache = false;
   let dryRun = false;
+  let verbose = false;
   let runner: RunnerName | undefined;
   let inPassthrough = false;
+  let check = false;
+  let json = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -157,6 +166,19 @@ export function parseCliArgs(argv: string[]): CliArgs {
       case "--dry-run":
         dryRun = true;
         break;
+
+      case "--verbose":
+      case "-v":
+        verbose = true;
+        break;
+
+      case "--check":
+        check = true;
+        break;
+
+      case "--json":
+        json = true;
+        break;
     }
   }
 
@@ -170,8 +192,11 @@ export function parseCliArgs(argv: string[]): CliArgs {
     templateVars,
     noCache,
     dryRun,
+    verbose,
     runner,
     passthroughArgs,
+    check,
+    json,
   };
 }
 
@@ -227,10 +252,18 @@ Options:
   --add-dir <dir>         Add directory to allowed list
   --no-cache              Skip cache and force fresh execution
   --dry-run               Show what would be executed without running
+  --check                 Validate frontmatter without executing
+  --json                  Output validation results as JSON (with --check)
+  --verbose, -v           Show debug info (runner, args, etc.)
   --help, -h              Show this help
 
 Passthrough:
   --                      Everything after -- is passed to the runner
+
+Validation:
+  ma --check task.md                    # Human-readable validation
+  ma --check task.md --json             # JSON output for piping
+  ma --check task.md --json | ma DOCTOR.md > fixed.md
 
 Examples:
   DEMO.md "focus on error handling"

@@ -4,7 +4,7 @@ import { validateFrontmatter } from "./schema";
 
 /**
  * Strip shebang line from content if present
- * Allows markdown files to be executable with #!/usr/bin/env md-agent
+ * Allows markdown files to be executable with #!/usr/bin/env ma
  */
 export function stripShebang(content: string): string {
   const lines = content.split("\n");
@@ -15,12 +15,18 @@ export function stripShebang(content: string): string {
 }
 
 /**
- * Parse YAML frontmatter from markdown content
- * Automatically strips shebang line if present
- * Uses js-yaml for robust parsing and zod for validation
+ * Raw parsed frontmatter result (before validation)
  */
-export function parseFrontmatter(content: string): ParsedMarkdown {
-  // Strip shebang first
+export interface RawParsedMarkdown {
+  frontmatter: unknown;
+  body: string;
+}
+
+/**
+ * Extract raw frontmatter without validation
+ * Use this for --check mode to inspect invalid files without throwing
+ */
+export function parseRawFrontmatter(content: string): RawParsedMarkdown {
   const strippedContent = stripShebang(content);
   const lines = strippedContent.split("\n");
 
@@ -44,24 +50,33 @@ export function parseFrontmatter(content: string): ParsedMarkdown {
   const body = lines.slice(endIndex + 1).join("\n").trim();
 
   try {
-    // Parse YAML
     const parsed = yaml.load(frontmatterYaml);
-
-    // Handle empty frontmatter
-    if (parsed === null || parsed === undefined) {
-      return { frontmatter: {}, body };
-    }
-
-    // Validate against schema
-    const frontmatter = validateFrontmatter(parsed);
-
-    return { frontmatter: frontmatter as CopilotFrontmatter, body };
+    return { frontmatter: parsed ?? {}, body };
   } catch (err) {
     if (err instanceof yaml.YAMLException) {
       throw new Error(`YAML parse error: ${err.message}`);
     }
     throw err;
   }
+}
+
+/**
+ * Parse YAML frontmatter from markdown content
+ * Automatically strips shebang line if present
+ * Uses js-yaml for robust parsing and zod for validation
+ */
+export function parseFrontmatter(content: string): ParsedMarkdown {
+  const { frontmatter: raw, body } = parseRawFrontmatter(content);
+
+  // Handle empty frontmatter
+  if (raw === null || raw === undefined || (typeof raw === 'object' && Object.keys(raw as object).length === 0)) {
+    return { frontmatter: {}, body };
+  }
+
+  // Validate against schema
+  const frontmatter = validateFrontmatter(raw);
+
+  return { frontmatter: frontmatter as CopilotFrontmatter, body };
 }
 
 /**

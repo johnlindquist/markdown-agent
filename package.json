@@ -1,14 +1,14 @@
 {
-  "name": "md-agent",
+  "name": "markdown-agent",
   "module": "src/index.ts",
   "type": "module",
-  "private": true,
   "bin": {
-    "md-agent": "./src/index.ts"
+    "markdown-agent": "./src/index.ts",
+    "ma": "./src/index.ts"
   },
   "scripts": {
     "test": "bun test --bail=1",
-    "md-agent": "bun run src/index.ts"
+    "ma": "bun run src/index.ts"
   },
   "devDependencies": {
     "@types/bun": "latest",

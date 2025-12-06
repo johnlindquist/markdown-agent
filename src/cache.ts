@@ -7,7 +7,7 @@ import { mkdir, readdir, stat, unlink } from "fs/promises";
 import { join } from "path";
 import { createHash } from "crypto";
 
-const CACHE_DIR = ".md-agent/cache";
+const CACHE_DIR = ".markdown-agent/cache";
 const MAX_CACHE_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
 const MAX_CACHE_SIZE = 100; // Maximum number of cache entries
 

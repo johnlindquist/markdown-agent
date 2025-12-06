@@ -1,6 +1,6 @@
 /**
  * Remote execution support for running agents from URLs
- * Enables npx-style execution: md-agent https://gist.github.com/user/setup.md
+ * Enables npx-style execution: ma https://gist.github.com/user/setup.md
  */
 
 import { mkdtemp, rm } from "fs/promises";
@@ -65,7 +65,7 @@ export async function fetchRemote(url: string): Promise<RemoteResult> {
 
     const response = await fetch(rawUrl, {
       headers: {
-        "User-Agent": "md-agent/1.0",
+        "User-Agent": "markdown-agent/1.0",
         "Accept": "text/plain, text/markdown, */*",
       },
     });
@@ -81,7 +81,7 @@ export async function fetchRemote(url: string): Promise<RemoteResult> {
     const content = await response.text();
 
     // Create temp directory
-    const tempDir = await mkdtemp(join(tmpdir(), "md-agent-"));
+    const tempDir = await mkdtemp(join(tmpdir(), "markdown-agent-"));
     const fileName = extractFileName(url) || "remote.md";
     const localPath = join(tempDir, fileName);
 
