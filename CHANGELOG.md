@@ -1,3 +1,10 @@
+# [2.2.0](https://github.com/johnlindquist/markdown-agent/compare/v2.1.1...v2.2.0) (2025-12-07)
+
+
+### Features
+
+* add $1 positional-to-flag mapping for commands ([43e6c54](https://github.com/johnlindquist/markdown-agent/commit/43e6c54e4697bdf4e37480414c034f909d5fc76f))
+
 ## [2.1.1](https://github.com/johnlindquist/markdown-agent/compare/v2.1.0...v2.1.1) (2025-12-07)
 
 

@@ -1,6 +1,6 @@
 {
   "name": "markdown-agent",
-  "version": "2.1.1",
+  "version": "2.2.0",
   "module": "src/index.ts",
   "type": "module",
   "repository": {
