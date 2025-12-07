@@ -2,64 +2,54 @@ import { expect, test, describe } from "bun:test";
 import { validateFrontmatter, safeParseFrontmatter } from "./schema";
 
 describe("validateFrontmatter", () => {
-  test("validates minimal frontmatter", () => {
-    const result = validateFrontmatter({ command: "claude" });
-    expect(result.command).toBe("claude");
+  test("validates empty frontmatter", () => {
+    const result = validateFrontmatter({});
+    expect(result).toEqual({});
   });
 
-  test("validates inputs array", () => {
+  test("validates args array", () => {
     const result = validateFrontmatter({
-      inputs: [
-        { name: "branch", type: "text", message: "Branch?" },
-        { name: "force", type: "confirm", message: "Force?", default: false },
-      ]
+      args: ["message", "branch"]
     });
-    expect(result.inputs).toHaveLength(2);
-    expect(result.inputs![0]!.name).toBe("branch");
-    expect(result.inputs![1]!.default).toBe(false);
+    expect(result.args).toEqual(["message", "branch"]);
   });
 
-  test("validates select input with choices", () => {
+  test("validates env as object (process.env config)", () => {
     const result = validateFrontmatter({
-      inputs: [
-        { name: "env", type: "select", message: "Env?", choices: ["dev", "prod"] }
-      ]
+      env: { HOST: "localhost", PORT: "3000" }
     });
-    expect(result.inputs![0]!.choices).toEqual(["dev", "prod"]);
+    expect(result.env).toEqual({ HOST: "localhost", PORT: "3000" });
   });
 
-  test("rejects select without choices", () => {
-    expect(() => validateFrontmatter({
-      inputs: [
-        { name: "env", type: "select", message: "Env?" }
-      ]
-    })).toThrow("Select inputs require a non-empty choices array");
-  });
-
-  test("validates requires object", () => {
+  test("validates env as array (--env flags)", () => {
     const result = validateFrontmatter({
-      requires: {
-        bin: ["docker", "gh"],
-        env: ["GITHUB_TOKEN"]
-      }
+      env: ["HOST=localhost", "PORT=3000"]
     });
-    expect(result.requires?.bin).toEqual(["docker", "gh"]);
-    expect(result.requires?.env).toEqual(["GITHUB_TOKEN"]);
+    expect(result.env).toEqual(["HOST=localhost", "PORT=3000"]);
   });
 
-  test("validates cache flag", () => {
-    const result = validateFrontmatter({ cache: true });
-    expect(result.cache).toBe(true);
+  test("validates env as string", () => {
+    const result = validateFrontmatter({
+      env: "HOST=localhost"
+    });
+    expect(result.env).toBe("HOST=localhost");
+  });
+
+  test("allows $N positional mappings", () => {
+    const result = validateFrontmatter({
+      $1: "prompt",
+      $2: "model"
+    });
+    expect((result as any).$1).toBe("prompt");
+    expect((result as any).$2).toBe("model");
   });
 
   test("allows unknown keys - they become CLI flags", () => {
     const result = validateFrontmatter({
-      command: "claude",
       model: "opus",
       "dangerously-skip-permissions": true,
       "mcp-config": "./mcp.json"
     });
-    expect(result.command).toBe("claude");
     expect((result as any).model).toBe("opus");
     expect((result as any)["dangerously-skip-permissions"]).toBe(true);
     expect((result as any)["mcp-config"]).toBe("./mcp.json");
@@ -68,25 +58,20 @@ describe("validateFrontmatter", () => {
 
 describe("safeParseFrontmatter", () => {
   test("returns success with valid data", () => {
-    const result = safeParseFrontmatter({ command: "gemini" });
+    const result = safeParseFrontmatter({ model: "opus" });
     expect(result.success).toBe(true);
-    expect(result.data?.command).toBe("gemini");
+    expect(result.data?.model).toBe("opus");
   });
 
-  test("returns errors with invalid data", () => {
-    const result = safeParseFrontmatter({
-      inputs: [{ type: "text" }] // Missing name and message
-    });
+  test("returns success with args", () => {
+    const result = safeParseFrontmatter({ args: ["name", "value"] });
+    expect(result.success).toBe(true);
+    expect(result.data?.args).toEqual(["name", "value"]);
+  });
+
+  test("returns errors when args is not an array", () => {
+    const result = safeParseFrontmatter({ args: "invalid" });
     expect(result.success).toBe(false);
     expect(result.errors).toBeDefined();
-    expect(result.errors!.length).toBeGreaterThan(0);
-  });
-
-  test("formats error paths correctly", () => {
-    const result = safeParseFrontmatter({
-      inputs: [{ name: "test", type: "invalid", message: "test" }]
-    });
-    expect(result.success).toBe(false);
-    expect(result.errors?.some(e => e.includes("inputs.0.type"))).toBe(true);
   });
 });

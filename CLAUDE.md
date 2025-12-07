@@ -29,22 +29,30 @@ bun run ma task.claude.md
 
 ### Core Flow (`src/index.ts`)
 ```
-.md file → parseFrontmatter() → mergeFrontmatter(cli overrides)
+.md file → parseFrontmatter() → resolveCommand(filename/env)
+        → loadGlobalConfig() → applyDefaults()
         → expandImports() → substituteTemplateVars()
-        → resolveCommand() → buildArgs() → runCommand()
+        → buildArgs() → runCommand()
 ```
 
 ### Key Modules
 
 - **`command.ts`** - Command resolution and execution
   - `parseCommandFromFilename()`: Infers command from `task.claude.md` → `claude`
-  - `resolveCommand()`: Priority: CLI > frontmatter > filename
+  - `resolveCommand()`: Priority: MA_COMMAND env var > filename
   - `buildArgs()`: Converts frontmatter to CLI flags
-  - `runCommand()`: Spawns the command with prompt as argument
+  - `extractPositionalMappings()`: Extracts $1, $2, etc. mappings
+  - `runCommand()`: Spawns the command with positional args
+
+- **`config.ts`** - Global configuration
+  - Loads defaults from `~/.markdown-agent/config.yaml`
+  - Built-in defaults: copilot maps $1 → prompt
+  - `getCommandDefaults()`: Get defaults for a command
+  - `applyDefaults()`: Merge defaults with frontmatter
 
 - **`types.ts`** - Core TypeScript interfaces
   - `AgentFrontmatter`: Simple interface with system keys + passthrough
-  - System keys: `command`, `$1`, `inputs`, `cache`, `requires`
+  - System keys: `args`, `env`, `$1`/`$2`/etc.
 
 - **`schema.ts`** - Minimal Zod validation (system keys only, rest passthrough)
 
@@ -65,23 +73,50 @@ bun run ma task.claude.md
 ### Command Resolution
 
 Commands are resolved in priority order:
-1. CLI flag: `--command claude` or `-c claude`
-2. Frontmatter: `command: claude`
-3. Filename: `task.claude.md` → `claude`
+1. `MA_COMMAND` environment variable
+2. Filename pattern: `task.claude.md` → `claude`
 
-### Frontmatter → CLI Flags
+### Frontmatter Keys
 
-All non-system frontmatter keys are passed directly to the command:
+**System keys** (consumed by ma, not passed to command):
+- `args`: Named positional arguments for template vars
+- `env` (object form): Sets process.env before execution
+- `$1`, `$2`, etc.: Map positional args to flags
+
+**All other keys** are passed directly as CLI flags:
 
 ```yaml
 ---
-command: claude
 model: opus                  # → --model opus
 dangerously-skip-permissions: true  # → --dangerously-skip-permissions
 add-dir:                     # → --add-dir ./src --add-dir ./tests
   - ./src
   - ./tests
+env:                         # Object form: sets process.env
+  API_KEY: secret
 ---
+```
+
+### Positional Mapping ($N)
+
+Map the body or positional args to specific flags:
+
+```yaml
+---
+$1: prompt    # Body passed as --prompt <body> instead of positional
+---
+```
+
+### Global Config (`~/.markdown-agent/config.yaml`)
+
+Set default frontmatter per command:
+
+```yaml
+commands:
+  copilot:
+    $1: prompt    # Always map body to --prompt for copilot
+  claude:
+    model: sonnet # Default model for claude
 ```
 
 ### Template System (LiquidJS)
@@ -91,8 +126,7 @@ Uses [LiquidJS](https://liquidjs.com/) for full template support:
 - Variables: `{{ variable }}`
 - Conditionals: `{% if force %}--force{% endif %}`
 - Filters: `{{ name | upcase }}`, `{{ value | default: "fallback" }}`
-- CLI args: `--varname value` (unknown flags become template vars)
-- `inputs:` frontmatter for wizard mode (interactive prompts)
+- `args:` frontmatter to consume CLI positionals as template vars
 
 ## Testing Patterns
 
@@ -103,8 +137,8 @@ import { describe, it, expect } from "bun:test";
 
 describe("parseCliArgs", () => {
   it("parses command flag", () => {
-    const result = parseCliArgs(["node", "script", "file.md", "--command", "claude"]);
-    expect(result.command).toBe("claude");
+    const result = parseCliArgs(["node", "script", "file.md"]);
+    expect(result.filePath).toBe("file.md");
   });
 });
 ```

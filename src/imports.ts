@@ -530,6 +530,7 @@ async function processCommandInline(
       cwd: currentFileDir,
       stdout: "pipe",
       stderr: "pipe",
+      env: process.env,  // Explicitly inherit process.env (including frontmatter env vars)
     });
 
     const stdout = result.stdout.toString().trim();

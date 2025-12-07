@@ -1,7 +1,6 @@
 ---
-# Example: Local LLM via Codex OSS mode
+# Command inferred from filename: local-llm.codex.md → codex
 # Note: Requires Ollama or compatible local provider to be running
-command: codex
 oss: true
 local-provider: ollama
 ---

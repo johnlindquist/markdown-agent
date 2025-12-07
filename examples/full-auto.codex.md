@@ -1,6 +1,5 @@
 ---
-# Note: This file could be named fullAuto.codex.md to auto-infer command
-command: codex
+# Command inferred from filename: full-auto.codex.md → codex
 full-auto: true
 sandbox: workspace-write
 ---

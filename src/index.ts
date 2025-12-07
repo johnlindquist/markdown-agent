@@ -2,15 +2,12 @@
 import { parseFrontmatter } from "./parse";
 import { parseCliArgs, handleMaCommands } from "./cli";
 import { substituteTemplateVars, extractTemplateVars } from "./template";
-import { promptInputs, validateInputField } from "./inputs";
-import { generateCacheKey, readCache, writeCache } from "./cache";
-import { validatePrerequisites, handlePrerequisiteFailure } from "./prerequisites";
-import { isRemoteUrl, fetchRemote, cleanupRemote, printRemoteWarning } from "./remote";
-import { resolveCommand, buildArgs, runCommand } from "./command";
+import { isRemoteUrl, fetchRemote, cleanupRemote } from "./remote";
+import { resolveCommand, buildArgs, runCommand, extractPositionalMappings, extractEnvVars } from "./command";
 import { expandImports, hasImports } from "./imports";
 import { loadEnvFiles } from "./env";
-import { initLogger, getParseLogger, getTemplateLogger, getCommandLogger, getCacheLogger, getImportLogger } from "./logger";
-import type { InputField } from "./types";
+import { loadGlobalConfig, getCommandDefaults, applyDefaults } from "./config";
+import { initLogger, getParseLogger, getTemplateLogger, getCommandLogger, getImportLogger } from "./logger";
 import { dirname, resolve } from "path";
 
 /**
@@ -46,8 +43,6 @@ async function main() {
   let isRemote = false;
 
   if (isRemoteUrl(filePath)) {
-    printRemoteWarning(filePath);
-
     const remoteResult = await fetchRemote(filePath);
     if (!remoteResult.success) {
       console.error(`Failed to fetch remote file: ${remoteResult.error}`);
@@ -81,24 +76,81 @@ async function main() {
   const { frontmatter: baseFrontmatter, body: rawBody } = parseFrontmatter(content);
   getParseLogger().debug({ frontmatter: baseFrontmatter, bodyLength: rawBody.length }, "Frontmatter parsed");
 
-  // Handle wizard mode inputs
+  // Resolve command (from env var or filename)
+  let command: string;
+  try {
+    command = resolveCommand(localFilePath);
+    getCommandLogger().debug({ command }, "Command resolved");
+  } catch (err) {
+    getCommandLogger().error({ error: (err as Error).message }, "Command resolution failed");
+    console.error((err as Error).message);
+    process.exit(1);
+  }
+
+  // Load global config and apply command defaults
+  await loadGlobalConfig();
+  const commandDefaults = await getCommandDefaults(command);
+  const frontmatter = applyDefaults(baseFrontmatter, commandDefaults);
+
+  // Extract and apply environment variables (object form) to process.env
+  // This must happen BEFORE import expansion so !`command` inlines can use them
+  const envVars = extractEnvVars(frontmatter);
+  if (envVars) {
+    for (const [key, value] of Object.entries(envVars)) {
+      process.env[key] = value;
+    }
+  }
+
+  // Consume named positional arguments from CLI
   let templateVars: Record<string, string> = {};
-  if (baseFrontmatter.inputs && Array.isArray(baseFrontmatter.inputs)) {
-    const validatedInputs: InputField[] = [];
-    for (let i = 0; i < baseFrontmatter.inputs.length; i++) {
-      try {
-        const validated = validateInputField(baseFrontmatter.inputs[i], i);
-        validatedInputs.push(validated);
-      } catch (err) {
-        console.error(`Invalid input definition: ${(err as Error).message}`);
-        process.exit(1);
+  let remainingArgs = [...passthroughArgs];
+
+  if (frontmatter.args && Array.isArray(frontmatter.args)) {
+    const requiredArgs = frontmatter.args;
+
+    for (const argName of requiredArgs) {
+      // Find the first non-flag argument
+      const argIndex = remainingArgs.findIndex(arg => !arg.startsWith("-"));
+
+      if (argIndex !== -1) {
+        templateVars[argName] = remainingArgs[argIndex];
+        // Consume it so it isn't passed to the command
+        remainingArgs.splice(argIndex, 1);
+      }
+    }
+  }
+
+  // Extract $varname fields from frontmatter and match with --varname CLI flags
+  // These are consumed (not passed to command) and become template variables
+  // Frontmatter value is the default, CLI flag overrides it
+  const namedVarFields = Object.keys(frontmatter)
+    .filter(key => key.startsWith("$") && !/^\$\d+$/.test(key));
+
+  for (const key of namedVarFields) {
+    const varName = key.slice(1); // Remove $ prefix
+    const defaultValue = frontmatter[key];
+
+    // Look for --varname or --var-name (convert underscores to hyphens for matching)
+    const flagVariants = [
+      `--${varName}`,
+      `--${varName.replace(/_/g, "-")}`,
+    ];
+
+    let foundInCli = false;
+    for (const flag of flagVariants) {
+      const flagIndex = remainingArgs.findIndex(arg => arg === flag);
+      if (flagIndex !== -1 && flagIndex + 1 < remainingArgs.length) {
+        templateVars[varName] = remainingArgs[flagIndex + 1];
+        // Consume both flag and value
+        remainingArgs.splice(flagIndex, 2);
+        foundInCli = true;
+        break;
       }
     }
 
-    try {
-      templateVars = await promptInputs(validatedInputs, {});
-    } catch (err) {
-      process.exit(130);
+    // Use default value from frontmatter if not provided via CLI
+    if (!foundInCli && defaultValue !== undefined && defaultValue !== null && defaultValue !== "") {
+      templateVars[varName] = String(defaultValue);
     }
   }
 
@@ -120,9 +172,10 @@ async function main() {
   // Check for missing template variables
   const requiredVars = extractTemplateVars(expandedBody);
   const missingVars = requiredVars.filter(v => !(v in templateVars));
+
   if (missingVars.length > 0) {
     console.error(`Missing template variables: ${missingVars.join(", ")}`);
-    console.error(`Define 'inputs:' in frontmatter to prompt for values`);
+    console.error(`Use 'args:' in frontmatter to map CLI arguments to variables`);
     process.exit(1);
   }
 
@@ -131,20 +184,14 @@ async function main() {
   const body = substituteTemplateVars(expandedBody, templateVars);
   getTemplateLogger().debug({ bodyLength: body.length }, "Template substitution complete");
 
-  // Use frontmatter as-is (no CLI overrides)
-  const frontmatter = baseFrontmatter;
-
-  // If no frontmatter, just cat the file
-  if (Object.keys(frontmatter).length === 0) {
-    console.log(content);
-    process.exit(0);
-  }
-
-  // Check prerequisites before proceeding
-  if (frontmatter.requires) {
-    const prereqResult = await validatePrerequisites(frontmatter.requires);
-    if (!prereqResult.success) {
-      handlePrerequisiteFailure(prereqResult);
+  // If no frontmatter and no command from filename, just cat the file
+  if (Object.keys(baseFrontmatter).length === 0 && !commandDefaults) {
+    // Check if we still have a command from filename
+    try {
+      resolveCommand(localFilePath);
+    } catch {
+      console.log(content);
+      process.exit(0);
     }
   }
 
@@ -154,69 +201,32 @@ async function main() {
     finalBody = `<stdin>\n${stdinContent}\n</stdin>\n\n${finalBody}`;
   }
 
-  // Resolve command
-  let command: string;
-  try {
-    command = resolveCommand({
-      frontmatter,
-      filePath: localFilePath,
-    });
-    getCommandLogger().debug({ command, fromFilename: !frontmatter.command }, "Command resolved");
-  } catch (err) {
-    getCommandLogger().error({ error: (err as Error).message }, "Command resolution failed");
-    console.error((err as Error).message);
-    process.exit(1);
-  }
-
-  // Build CLI args from frontmatter + passthrough args
+  // Build CLI args from frontmatter + remaining passthrough args
   const templateVarSet = new Set(Object.keys(templateVars));
   const args = [
     ...buildArgs(frontmatter, templateVarSet),
-    ...passthroughArgs,
+    ...remainingArgs,
   ];
 
-  // Caching
-  const noCache = process.env.MA_NO_CACHE === "1";
-  const useCache = frontmatter.cache === true && !noCache;
-  const cacheKey = useCache
-    ? generateCacheKey({ frontmatter, body: finalBody })
-    : null;
+  // Extract positional mappings ($1, $2, etc.)
+  const positionalMappings = extractPositionalMappings(frontmatter);
 
-  let runResult: { exitCode: number; output: string };
+  // Build positionals array: body is $1, any remaining unmapped CLI args would be $2+
+  // For now, body is the only positional we support
+  const positionals = [finalBody];
 
-  if (cacheKey && !noCache) {
-    const cachedOutput = await readCache(cacheKey);
-    if (cachedOutput !== null) {
-      getCacheLogger().debug({ cacheKey }, "Cache hit");
-      console.log(cachedOutput);
-      runResult = { exitCode: 0, output: cachedOutput };
-    } else {
-      getCacheLogger().debug({ cacheKey }, "Cache miss");
-      getCommandLogger().info({ command, argsCount: args.length, promptLength: finalBody.length }, "Executing command");
-      runResult = await runCommand({
-        command,
-        args,
-        prompt: finalBody,
-        captureOutput: useCache,
-        positionalMap: frontmatter["$1"] as string | undefined,
-      });
-      getCommandLogger().info({ exitCode: runResult.exitCode }, "Command completed");
-      if (runResult.exitCode === 0 && runResult.output) {
-        await writeCache(cacheKey, runResult.output);
-        getCacheLogger().debug({ cacheKey }, "Result cached");
-      }
-    }
-  } else {
-    getCommandLogger().info({ command, argsCount: args.length, promptLength: finalBody.length }, "Executing command");
-    runResult = await runCommand({
-      command,
-      args,
-      prompt: finalBody,
-      captureOutput: false,
-      positionalMap: frontmatter["$1"] as string | undefined,
-    });
-    getCommandLogger().info({ exitCode: runResult.exitCode }, "Command completed");
-  }
+  getCommandLogger().info({ command, argsCount: args.length, promptLength: finalBody.length }, "Executing command");
+
+  const runResult = await runCommand({
+    command,
+    args,
+    positionals,
+    positionalMappings,
+    captureOutput: false,
+    env: envVars,
+  });
+
+  getCommandLogger().info({ exitCode: runResult.exitCode }, "Command completed");
 
   // Cleanup remote temporary file
   if (isRemote) {

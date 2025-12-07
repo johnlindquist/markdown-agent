@@ -1,5 +1,5 @@
 import yaml from "js-yaml";
-import type { CopilotFrontmatter, ParsedMarkdown } from "./types";
+import type { AgentFrontmatter, ParsedMarkdown } from "./types";
 import { validateFrontmatter } from "./schema";
 
 /**
@@ -76,7 +76,7 @@ export function parseFrontmatter(content: string): ParsedMarkdown {
   // Validate against schema
   const frontmatter = validateFrontmatter(raw);
 
-  return { frontmatter: frontmatter as CopilotFrontmatter, body };
+  return { frontmatter: frontmatter as AgentFrontmatter, body };
 }
 
 /**

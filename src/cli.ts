@@ -1,5 +1,3 @@
-import type { AgentFrontmatter } from "./types";
-
 export interface CliArgs {
   filePath: string;
   passthroughArgs: string[];
@@ -64,12 +62,23 @@ Usage: ma <file.md> [any flags for the command]
        ma --logs
        ma --help
 
-When a markdown file is provided, ALL flags pass through to the command.
+Command resolution:
+  1. MA_COMMAND env var (e.g., MA_COMMAND=claude ma task.md)
+  2. Filename pattern (e.g., task.claude.md → claude)
+
+All frontmatter keys are passed as CLI flags to the command.
+Global defaults can be set in ~/.markdown-agent/config.yaml
 
 Examples:
   ma task.claude.md -p "print mode"
   ma task.claude.md --model opus --verbose
   ma commit.gemini.md
+  MA_COMMAND=claude ma task.md
+
+Config file example (~/.markdown-agent/config.yaml):
+  commands:
+    copilot:
+      $1: prompt    # Map body to --prompt flag
 
 Without a file:
   ma --setup    Configure shell to run .md files directly
@@ -111,14 +120,4 @@ export async function handleMaCommands(args: CliArgs): Promise<boolean> {
   }
 
   return false;
-}
-
-/**
- * Merge frontmatter with CLI overrides (CLI wins)
- */
-export function mergeFrontmatter(
-  frontmatter: AgentFrontmatter,
-  overrides: Partial<AgentFrontmatter>
-): AgentFrontmatter {
-  return { ...frontmatter, ...overrides };
 }

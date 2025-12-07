@@ -2,7 +2,6 @@ import { expect, test, describe } from "bun:test";
 import {
   isRemoteUrl,
   toRawUrl,
-  printRemoteWarning,
 } from "./remote";
 
 describe("isRemoteUrl", () => {
@@ -56,12 +55,5 @@ describe("toRawUrl", () => {
     const url = "https://example.com/file.md";
     const raw = toRawUrl(url);
     expect(raw).toBe(url);
-  });
-});
-
-describe("printRemoteWarning", () => {
-  test("does not throw", () => {
-    // Just verify it doesn't throw
-    expect(() => printRemoteWarning("https://example.com/file.md")).not.toThrow();
   });
 });

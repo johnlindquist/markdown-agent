@@ -1,6 +1,6 @@
 ---
 # Gemini smoke test - with yolo mode
-model: gemini-2.0-flash
+model: gemini-3-pro-preview
 yolo: true
 ---
 

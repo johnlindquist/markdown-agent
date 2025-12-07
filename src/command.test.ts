@@ -1,5 +1,5 @@
-import { expect, test, describe } from "bun:test";
-import { parseCommandFromFilename, resolveCommand, buildArgs } from "./command";
+import { expect, test, describe, beforeEach, afterEach } from "bun:test";
+import { parseCommandFromFilename, resolveCommand, buildArgs, extractPositionalMappings, extractEnvVars } from "./command";
 
 describe("parseCommandFromFilename", () => {
   test("extracts command from filename pattern", () => {
@@ -25,27 +25,33 @@ describe("parseCommandFromFilename", () => {
 });
 
 describe("resolveCommand", () => {
-  test("frontmatter command takes priority over filename", () => {
-    const result = resolveCommand({
-      frontmatter: { command: "gemini" },
-      filePath: "task.claude.md",
-    });
+  const originalEnv = process.env.MA_COMMAND;
+
+  beforeEach(() => {
+    delete process.env.MA_COMMAND;
+  });
+
+  afterEach(() => {
+    if (originalEnv !== undefined) {
+      process.env.MA_COMMAND = originalEnv;
+    } else {
+      delete process.env.MA_COMMAND;
+    }
+  });
+
+  test("MA_COMMAND env var takes priority over filename", () => {
+    process.env.MA_COMMAND = "gemini";
+    const result = resolveCommand("task.claude.md");
     expect(result).toBe("gemini");
   });
 
-  test("filename inference works when no command specified", () => {
-    const result = resolveCommand({
-      frontmatter: {},
-      filePath: "task.claude.md",
-    });
+  test("filename inference works when no env var", () => {
+    const result = resolveCommand("task.claude.md");
     expect(result).toBe("claude");
   });
 
   test("throws when no command can be resolved", () => {
-    expect(() => resolveCommand({
-      frontmatter: {},
-      filePath: "task.md",
-    })).toThrow("No command specified");
+    expect(() => resolveCommand("task.md")).toThrow("No command specified");
   });
 });
 
@@ -70,16 +76,53 @@ describe("buildArgs", () => {
     expect(result).toEqual(["--add-dir", "./src", "--add-dir", "./tests"]);
   });
 
-  test("skips system keys", () => {
+  test("skips system keys (args)", () => {
     const result = buildArgs({
-      command: "claude",
-      inputs: [],
-      requires: { bin: ["git"] },
-      cache: true,
-      "$1": "prompt",  // $1 is a system key
+      args: ["message", "branch"],
       model: "opus",
     }, new Set());
     expect(result).toEqual(["--model", "opus"]);
+  });
+
+  test("skips positional mappings ($1, $2)", () => {
+    const result = buildArgs({
+      $1: "prompt",
+      $2: "model",
+      verbose: true,
+    }, new Set());
+    expect(result).toEqual(["--verbose"]);
+  });
+
+  test("skips env when it is an object (process.env config)", () => {
+    const result = buildArgs({
+      env: { HOST: "localhost" },
+      model: "opus",
+    }, new Set());
+    expect(result).toEqual(["--model", "opus"]);
+  });
+
+  test("passes env as --env flags when it is an array", () => {
+    const result = buildArgs({
+      env: ["HOST=localhost", "PORT=3000"],
+      model: "opus",
+    }, new Set());
+    // Order depends on object key enumeration
+    expect(result).toContain("--env");
+    expect(result).toContain("HOST=localhost");
+    expect(result).toContain("PORT=3000");
+    expect(result).toContain("--model");
+    expect(result).toContain("opus");
+  });
+
+  test("passes env as --env flag when it is a string", () => {
+    const result = buildArgs({
+      env: "HOST=localhost",
+      model: "opus",
+    }, new Set());
+    expect(result).toContain("--env");
+    expect(result).toContain("HOST=localhost");
+    expect(result).toContain("--model");
+    expect(result).toContain("opus");
   });
 
   test("skips template variables", () => {
@@ -93,5 +136,56 @@ describe("buildArgs", () => {
   test("handles single-char flags", () => {
     const result = buildArgs({ p: true, c: true }, new Set());
     expect(result).toEqual(["-p", "-c"]);
+  });
+});
+
+describe("extractPositionalMappings", () => {
+  test("extracts $1, $2, etc. mappings", () => {
+    const mappings = extractPositionalMappings({
+      $1: "prompt",
+      $2: "model",
+      verbose: true,
+    });
+    expect(mappings.get(1)).toBe("prompt");
+    expect(mappings.get(2)).toBe("model");
+    expect(mappings.size).toBe(2);
+  });
+
+  test("returns empty map when no positional mappings", () => {
+    const mappings = extractPositionalMappings({
+      model: "opus",
+      verbose: true,
+    });
+    expect(mappings.size).toBe(0);
+  });
+});
+
+describe("extractEnvVars", () => {
+  test("extracts object form of env", () => {
+    const env = extractEnvVars({
+      env: { HOST: "localhost", PORT: "3000" },
+    });
+    expect(env).toEqual({ HOST: "localhost", PORT: "3000" });
+  });
+
+  test("returns undefined for array form", () => {
+    const env = extractEnvVars({
+      env: ["HOST=localhost"],
+    });
+    expect(env).toBeUndefined();
+  });
+
+  test("returns undefined for string form", () => {
+    const env = extractEnvVars({
+      env: "HOST=localhost",
+    });
+    expect(env).toBeUndefined();
+  });
+
+  test("returns undefined when no env", () => {
+    const env = extractEnvVars({
+      model: "opus",
+    });
+    expect(env).toBeUndefined();
   });
 });

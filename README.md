@@ -1,9 +1,9 @@
 # markdown-agent
 
 ```bash
-REVIEW.claude.md                 # Run with Claude
-COMMIT.gemini.md "fix auth bug"  # Run with Gemini
-git diff | EXPLAIN.md            # Pipe through any command
+review.claude.md                 # Run with Claude
+commit.gemini.md "fix auth bug"  # Run with Gemini
+git diff | explain.claude.md     # Pipe through any command
 ```
 
 **Your markdown files are now executable AI agents.**
@@ -12,7 +12,7 @@ git diff | EXPLAIN.md            # Pipe through any command
 
 ## What Is This?
 
-Markdown files become first-class CLI commands. Write a prompt in markdown, run it like a script. The command is inferred from the filename or specified in frontmatter.
+Markdown files become first-class CLI commands. Write a prompt in markdown, run it like a script. The command is inferred from the filename.
 
 ```markdown
 # review.claude.md
@@ -26,7 +26,7 @@ Review this code for bugs and suggest improvements.
 
 ```bash
 review.claude.md                 # Runs: claude --model opus <prompt>
-review.claude.md -- --verbose    # Pass extra flags after --
+review.claude.md --verbose       # Pass extra flags
 ```
 
 ---
@@ -41,7 +41,7 @@ Name your file `task.COMMAND.md` and the command is inferred:
 task.claude.md    # Runs claude
 task.gemini.md    # Runs gemini
 task.codex.md     # Runs codex
-task.copilot.md   # Runs copilot
+task.copilot.md   # Runs copilot (body auto-mapped to --prompt)
 ```
 
 ### 2. Frontmatter → CLI Flags
@@ -50,7 +50,6 @@ Every YAML key becomes a CLI flag passed to the command:
 
 ```yaml
 ---
-command: claude          # Explicit command (overrides filename)
 model: opus              # → --model opus
 dangerously-skip-permissions: true  # → --dangerously-skip-permissions
 mcp-config: ./mcp.json   # → --mcp-config ./mcp.json
@@ -73,7 +72,7 @@ markdown-agent embraces the Unix philosophy:
 - **No magic mapping** - Frontmatter keys pass directly to the command
 - **Stdin/stdout** - Pipe data in and out
 - **Composable** - Chain agents together
-- **Transparent** - Use `--dry-run` to see exactly what runs
+- **Transparent** - See what runs in logs
 
 ```bash
 # Pipe input
@@ -81,9 +80,6 @@ git diff | ma review.claude.md
 
 # Chain agents
 ma plan.claude.md | ma implement.codex.md
-
-# See what would run
-ma task.claude.md --dry-run
 ```
 
 ---
@@ -103,15 +99,11 @@ bun install && bun link
 ma task.claude.md
 ma task.gemini.md
 
-# Explicit command override
-ma task.md --command claude
-ma task.md -c gemini
+# Override command via environment variable
+MA_COMMAND=claude ma task.md
 
 # Pass additional flags to the command
-ma task.claude.md -- --verbose --debug
-
-# Dry-run to see what would execute
-ma task.claude.md --dry-run
+ma task.claude.md --verbose --debug
 ```
 
 > **Note:** Both `ma` and `markdown-agent` commands are available.
@@ -122,9 +114,8 @@ ma task.claude.md --dry-run
 
 Commands are resolved in this priority order:
 
-1. **CLI flag**: `--command claude` or `-c claude`
-2. **Frontmatter**: `command: claude`
-3. **Filename**: `task.claude.md` → `claude`
+1. **Environment variable**: `MA_COMMAND=claude`
+2. **Filename pattern**: `task.claude.md` → `claude`
 
 If no command can be resolved, you'll get an error with instructions.
 
@@ -136,11 +127,10 @@ If no command can be resolved, you'll get an error with instructions.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `command` | string | Command to execute (e.g., `claude`, `gemini`, `codex`) |
-| `$1` | string | Map body to a flag instead of positional (e.g., `$1: prompt` → `--prompt <body>`) |
-| `inputs` | InputField[] | Wizard mode interactive prompts |
-| `cache` | boolean | Enable result caching |
-| `requires` | object | Prerequisites: `bin`, `env` arrays |
+| `args` | string[] | Named positional arguments for template variables |
+| `env` | object | Set process environment variables |
+| `env` | string[] | Pass as `--env` flags to command |
+| `$1`, `$2`... | string | Map positional args to flags (e.g., `$1: prompt`) |
 
 ### All Other Keys → CLI Flags
 
@@ -148,7 +138,6 @@ Every other frontmatter key is passed directly to the command:
 
 ```yaml
 ---
-command: claude
 model: opus                           # → --model opus
 dangerously-skip-permissions: true    # → --dangerously-skip-permissions
 mcp-config: ./mcp.json                # → --mcp-config ./mcp.json
@@ -161,6 +150,22 @@ p: true                               # → -p (single char = short flag)
 - `key: true` → `--key`
 - `key: false` → (omitted)
 - `key: [a, b]` → `--key a --key b`
+
+---
+
+## Global Configuration
+
+Set default frontmatter per command in `~/.markdown-agent/config.yaml`:
+
+```yaml
+commands:
+  copilot:
+    $1: prompt    # Always map body to --prompt for copilot
+  claude:
+    model: sonnet # Default model for claude
+```
+
+**Built-in defaults:** Copilot automatically maps `$1: prompt` so you can use it without any frontmatter.
 
 ---
 
@@ -183,7 +188,7 @@ Analyze the database schema and suggest optimizations.
 ```markdown
 # refactor.gemini.md
 ---
-model: gemini-2.5-pro
+model: gemini-3-pro-preview
 yolo: true
 ---
 Refactor the authentication module to use async/await.
@@ -201,38 +206,40 @@ full-auto: true
 Analyze this codebase and suggest improvements.
 ```
 
-### Copilot (requires $1 mapping)
-
-Some tools don't accept positional prompts. Use `$1` to map the body to a flag:
+### Copilot (no frontmatter needed!)
 
 ```markdown
 # task.copilot.md
----
-model: gpt-4.1
-$1: prompt
-silent: true
----
 Explain this code.
 ```
 
-This runs: `copilot --model gpt-4.1 --prompt "Explain this code." --silent`
+Thanks to the global config, this runs: `copilot --prompt "Explain this code."`
 
-### Wizard Mode with Inputs
+### Template Variables with Args
 
 ```markdown
-# deploy.claude.md
+# create-feature.claude.md
 ---
-inputs:
-  - name: env
-    type: select
-    message: "Deploy to which environment?"
-    choices: ["staging", "production"]
-  - name: force
-    type: confirm
-    message: "Force deploy?"
-    default: false
+args: [feature_name, target_dir]
+model: sonnet
 ---
-Deploy to {{ env }}{% if force %} with --force{% endif %}.
+Create a new feature called "{{ feature_name }}" in {{ target_dir }}.
+```
+
+```bash
+ma create-feature.claude.md "Auth" "src/features"
+```
+
+### Environment Variables
+
+```markdown
+# api-test.claude.md
+---
+env:
+  API_URL: https://api.example.com
+  DEBUG: "true"
+---
+Test the API at !`echo $API_URL`
 ```
 
 ---
@@ -247,7 +254,7 @@ Use `@` followed by a path to inline file contents:
 
 ```markdown
 ---
-command: claude
+model: claude
 ---
 Follow these coding standards:
 @~/.config/coding-standards.md
@@ -267,9 +274,6 @@ Imports are recursive—imported files can have their own `@` imports.
 Use glob patterns to include multiple files at once:
 
 ```markdown
----
-command: claude
----
 Review all TypeScript files in src:
 @./src/**/*.ts
 ```
@@ -324,9 +328,6 @@ Supported symbols:
 Use `` !`command` `` to execute a shell command and inline its output:
 
 ```markdown
----
-command: claude
----
 Current branch: !`git branch --show-current`
 Recent commits:
 !`git log --oneline -5`
@@ -375,38 +376,35 @@ Environment variables are available:
 ## CLI Options
 
 ```
-Usage: ma <file.md> [text] [options] [-- passthrough-args]
+Usage: ma <file.md> [any flags for the command]
        ma --setup
+       ma --logs
+       ma --help
 
-Arguments:
-  file.md                 Markdown file to execute
-  text                    Additional text appended to the prompt
+Command resolution:
+  1. MA_COMMAND env var (e.g., MA_COMMAND=claude ma task.md)
+  2. Filename pattern (e.g., task.claude.md → claude)
 
-Options:
-  --command, -c <cmd>     Command to execute (e.g., claude, gemini)
-  --no-cache              Skip cache and force fresh execution
-  --dry-run               Show what would be executed without running
-  --check                 Validate frontmatter without executing
-  --json                  Output validation as JSON (with --check)
-  --verbose, -v           Show debug info
-  --logs                  Show log directory (~/.markdown-agent/logs/)
-  --setup                 Configure shell to run .md files directly
-  --help, -h              Show help
-
-Passthrough:
-  --                      Everything after -- is passed to the command
+All frontmatter keys are passed as CLI flags to the command.
+Global defaults can be set in ~/.markdown-agent/config.yaml
 
 Examples:
-  ma task.claude.md "focus on error handling"
-  ma task.md --command claude
-  ma commit.gemini.md --verbose
-  ma task.md -- --model opus --debug
+  ma task.claude.md -p "print mode"
+  ma task.claude.md --model opus --verbose
+  ma commit.gemini.md
+  MA_COMMAND=claude ma task.md
+
+Without a file:
+  ma --setup    Configure shell to run .md files directly
+  ma --logs     Show log directory
+  ma --help     Show this help
 ```
 
 ### Environment Variables
 
 | Variable | Description |
 |----------|-------------|
+| `MA_COMMAND` | Override command (e.g., `MA_COMMAND=claude ma task.md`) |
 | `MA_FORCE_CONTEXT` | Set to `1` to disable the 100k token limit for glob imports |
 | `NODE_ENV` | Controls which `.env.[NODE_ENV]` file is loaded (default: `development`) |
 
@@ -423,8 +421,8 @@ ma --setup   # One-time setup
 Then run agents directly:
 
 ```bash
-TASK.claude.md                   # Just type the filename
-TASK.claude.md --verbose         # With passthrough args
+task.claude.md                   # Just type the filename
+task.claude.md --verbose         # With passthrough args
 ```
 
 ### Manual Setup (zsh)
@@ -467,9 +465,8 @@ git diff | review.claude.md      # Review staged changes
 
 ## Notes
 
-- If no frontmatter is present, the file is printed as-is
+- If no frontmatter is present, the file is printed as-is (unless command inferred from filename)
 - Template system uses [LiquidJS](https://liquidjs.com/) - supports conditionals, loops, and filters
-- Use `--dry-run` to audit what will be executed
 - Logs are always written to `~/.markdown-agent/logs/<agent-name>/` for debugging
 - Use `--logs` to show the log directory
 - Stdin is wrapped in `<stdin>` tags and prepended to the prompt

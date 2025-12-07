@@ -5,43 +5,22 @@
 
 import { z } from "zod";
 
-/** Input field types for wizard mode */
-const inputTypeSchema = z.enum(["text", "confirm", "select", "password"]);
-
-/** Single input field definition */
-export const inputFieldSchema = z.object({
-  name: z.string().min(1, "Input name is required"),
-  type: inputTypeSchema,
-  message: z.string().min(1, "Input message is required"),
-  default: z.union([z.string(), z.boolean()]).optional(),
-  choices: z.array(z.string()).optional(),
-}).refine(
-  (data) => {
-    if (data.type === "select" && (!data.choices || data.choices.length === 0)) {
-      return false;
-    }
-    return true;
-  },
-  { message: "Select inputs require a non-empty choices array" }
-);
+/** Coerce any primitive value to string (for env vars where YAML may parse as bool/number) */
+const stringCoerce = z.union([z.string(), z.number(), z.boolean()]).transform(v => String(v));
 
 /** Main frontmatter schema - minimal, passthrough everything else */
 export const frontmatterSchema = z.object({
-  // Command to execute
-  command: z.string().optional(),
+  // Named positional arguments
+  args: z.array(z.string()).optional(),
 
-  // Wizard mode inputs
-  inputs: z.array(inputFieldSchema).optional(),
-
-  // Caching
-  cache: z.boolean().optional(),
-
-  // Prerequisites
-  requires: z.object({
-    bin: z.array(z.string()).optional(),
-    env: z.array(z.string()).optional(),
-  }).optional(),
-}).passthrough(); // Allow all other keys - they become CLI flags
+  // Environment variables: Object (config) or Array/String (flag)
+  // Object values can be string, number, or boolean (coerced to string)
+  env: z.union([
+    z.record(z.string(), stringCoerce),
+    z.array(z.string()),
+    z.string()
+  ]).optional(),
+}).passthrough(); // Allow all other keys - they become CLI flags (including $1, $2, etc.)
 
 /** Type inferred from schema */
 export type FrontmatterSchema = z.infer<typeof frontmatterSchema>;

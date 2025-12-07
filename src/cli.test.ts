@@ -1,6 +1,5 @@
 import { expect, test, describe } from "bun:test";
-import { parseCliArgs, mergeFrontmatter } from "./cli";
-import type { AgentFrontmatter } from "./types";
+import { parseCliArgs } from "./cli";
 
 describe("parseCliArgs", () => {
   test("extracts file path", () => {
@@ -44,38 +43,5 @@ describe("parseCliArgs", () => {
     expect(result.help).toBe(false);
     expect(result.setup).toBe(false);
     expect(result.passthroughArgs).toEqual(["--help", "--setup"]);
-  });
-});
-
-describe("mergeFrontmatter", () => {
-  test("merges frontmatter with empty overrides", () => {
-    const frontmatter: AgentFrontmatter = { command: "claude" };
-    const result = mergeFrontmatter(frontmatter, {});
-    expect(result.command).toBe("claude");
-  });
-
-  test("overrides command", () => {
-    const frontmatter: AgentFrontmatter = { command: "claude" };
-    const result = mergeFrontmatter(frontmatter, { command: "gemini" });
-    expect(result.command).toBe("gemini");
-  });
-
-  test("adds new fields from overrides", () => {
-    const frontmatter: AgentFrontmatter = { command: "claude" };
-    const result = mergeFrontmatter(frontmatter, { model: "opus" } as any);
-    expect(result.command).toBe("claude");
-    expect((result as any).model).toBe("opus");
-  });
-
-  test("preserves all frontmatter keys", () => {
-    const frontmatter: AgentFrontmatter = {
-      command: "claude",
-      model: "opus",
-      "dangerously-skip-permissions": true
-    } as any;
-    const result = mergeFrontmatter(frontmatter, {});
-    expect(result.command).toBe("claude");
-    expect((result as any).model).toBe("opus");
-    expect((result as any)["dangerously-skip-permissions"]).toBe(true);
   });
 });

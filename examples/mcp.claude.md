@@ -1,7 +1,5 @@
 ---
-# Note: This file is named claude-mcp.md but could be mcp.claude.md
-# to auto-infer the command from filename
-command: claude
+# Command inferred from filename: mcp.claude.md → claude
 model: opus
 mcp-config: ./postgres-mcp.json
 dangerously-skip-permissions: true

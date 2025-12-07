@@ -1,31 +1,28 @@
-/** Input field definition for wizard mode */
-export interface InputField {
-  name: string;
-  type: "text" | "confirm" | "select" | "password";
-  message: string;
-  default?: string | boolean;
-  choices?: string[];  // For select type
-}
-
-/** Prerequisites for script execution */
-export interface Prerequisites {
-  bin?: string[];   // Required binaries
-  env?: string[];   // Required environment variables
-}
-
 /** Frontmatter configuration - keys become CLI flags */
 export interface AgentFrontmatter {
-  /** Command to execute (e.g., claude, codex, gemini) */
-  command?: string;
+  /** Named positional arguments to consume from CLI and map to template vars */
+  args?: string[];
 
-  /** Wizard mode inputs - collect values interactively */
-  inputs?: InputField[];
+  /**
+   * Environment variables (polymorphic):
+   * - Object { KEY: "VAL" }: Sets process.env before execution
+   * - Array ["KEY=VAL"] or String "KEY=VAL": Passes as --env flags to command
+   */
+  env?: Record<string, string> | string[] | string;
 
-  /** Prerequisites to check before running */
-  requires?: Prerequisites;
+  /**
+   * Positional argument mapping ($1, $2, etc.)
+   * Maps positional arguments to CLI flags
+   * Example: $1: prompt → body becomes --prompt <body>
+   */
+  [key: `$${number}`]: string;
 
-  /** Enable result caching */
-  cache?: boolean;
+  /**
+   * Named template variables ($varname)
+   * Reads value from --varname CLI flag and makes it available as {{ varname }}
+   * Example: $feature_name: → reads --feature_name value → {{ feature_name }}
+   */
+  [key: `$${string}`]: string | undefined;
 
   /**
    * All other keys are passed directly as CLI flags to the command.

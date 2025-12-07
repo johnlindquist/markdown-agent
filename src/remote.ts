@@ -127,17 +127,3 @@ export async function cleanupRemote(localPath: string): Promise<void> {
   }
 }
 
-/**
- * Display security warning for remote execution
- */
-export function printRemoteWarning(url: string): void {
-  console.log("════════════════════════════════════════════════════════════════");
-  console.log("  ⚠️  REMOTE EXECUTION WARNING");
-  console.log("════════════════════════════════════════════════════════════════");
-  console.log(`  Source: ${url}`);
-  console.log("");
-  console.log("  Running scripts from the internet can be dangerous.");
-  console.log("  Use --dry-run first to inspect what will be executed.");
-  console.log("════════════════════════════════════════════════════════════════");
-  console.log("");
-}
