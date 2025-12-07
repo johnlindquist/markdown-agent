@@ -1,3 +1,10 @@
+## [2.1.1](https://github.com/johnlindquist/markdown-agent/compare/v2.1.0...v2.1.1) (2025-12-07)
+
+
+### Bug Fixes
+
+* remove incorrect runner references from flags ([f33b83b](https://github.com/johnlindquist/markdown-agent/commit/f33b83bda34bafb505980ae5afd3b0e230208383))
+
 # [2.1.0](https://github.com/johnlindquist/markdown-agent/compare/v2.0.0...v2.1.0) (2025-12-06)
 
 
