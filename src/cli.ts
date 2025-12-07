@@ -1,5 +1,4 @@
-import type { AgentFrontmatter, CopilotFrontmatter } from "./types";
-import type { HarnessName } from "./harnesses/types";
+import type { AgentFrontmatter } from "./types";
 import { parseTemplateArgs, type TemplateVars } from "./template";
 
 export interface CliArgs {
@@ -10,7 +9,7 @@ export interface CliArgs {
   noCache: boolean;
   dryRun: boolean;
   verbose: boolean;
-  harness?: HarnessName;
+  command?: string;
   passthroughArgs: string[];
   check: boolean;
   json: boolean;
@@ -21,20 +20,11 @@ export interface CliArgs {
 
 /** Known CLI flags that shouldn't be treated as template variables */
 export const KNOWN_FLAGS = new Set([
-  "--model", "-m",
-  "--agent",
-  "--silent", "-s", "--no-silent",
-  "--interactive", "-i",
-  "--allow-all-tools",
-  "--allow-all-paths",
-  "--allow-tool",
-  "--deny-tool",
-  "--add-dir",
+  "--command", "-c",
   "--help", "-h",
   "--dry-run",
   "--no-cache",
   "--verbose", "-v",
-  "--harness", "-r",
   "--check",
   "--json",
   "--run-batch",
@@ -43,13 +33,11 @@ export const KNOWN_FLAGS = new Set([
   "--",  // Passthrough separator
 ]);
 
-const VALID_HARNESSES = new Set(["claude", "codex", "copilot", "gemini"]);
-
 /**
- * Parse CLI arguments and extract overrides for frontmatter
+ * Parse CLI arguments
  */
 export function parseCliArgs(argv: string[]): CliArgs {
-  const args = argv.slice(2); // Skip node and script path
+  const args = argv.slice(2);
   let filePath = "";
   const overrides: Partial<AgentFrontmatter> = {};
   const positionalArgs: string[] = [];
@@ -57,7 +45,7 @@ export function parseCliArgs(argv: string[]): CliArgs {
   let noCache = false;
   let dryRun = false;
   let verbose = false;
-  let harness: HarnessName | undefined;
+  let command: string | undefined;
   let inPassthrough = false;
   let check = false;
   let json = false;
@@ -85,80 +73,17 @@ export function parseCliArgs(argv: string[]): CliArgs {
       if (!filePath) {
         filePath = arg;
       } else {
-        // Additional positional args after file path
         positionalArgs.push(arg);
       }
       continue;
     }
 
     switch (arg) {
-      case "--model":
-      case "-m":
+      case "--command":
+      case "-c":
         if (nextArg) {
-          overrides.model = nextArg;
+          command = nextArg;
           i++;
-        }
-        break;
-
-      case "--agent":
-        if (nextArg) {
-          // Agent goes to copilot config
-          overrides.copilot = { ...overrides.copilot, agent: nextArg };
-          i++;
-        }
-        break;
-
-      case "--silent":
-      case "-s":
-        overrides.silent = true;
-        break;
-
-      case "--no-silent":
-        overrides.silent = false;
-        break;
-
-      case "--interactive":
-      case "-i":
-        overrides.interactive = true;
-        break;
-
-      case "--allow-all-tools":
-        overrides["allow-all-tools"] = true;
-        break;
-
-      case "--allow-all-paths":
-        overrides["allow-all-paths"] = true;
-        break;
-
-      case "--allow-tool":
-        if (nextArg) {
-          overrides["allow-tool"] = nextArg;
-          i++;
-        }
-        break;
-
-      case "--deny-tool":
-        if (nextArg) {
-          overrides["deny-tool"] = nextArg;
-          i++;
-        }
-        break;
-
-      case "--add-dir":
-        if (nextArg) {
-          overrides["add-dir"] = nextArg;
-          i++;
-        }
-        break;
-
-      case "--harness":
-      case "-r":
-        if (nextArg && VALID_HARNESSES.has(nextArg)) {
-          harness = nextArg as HarnessName;
-          i++;
-        } else if (nextArg) {
-          console.error(`Invalid harness: ${nextArg}. Valid options: claude, codex, copilot, gemini`);
-          process.exit(1);
         }
         break;
 
@@ -217,7 +142,7 @@ export function parseCliArgs(argv: string[]): CliArgs {
     noCache,
     dryRun,
     verbose,
-    harness,
+    command,
     passthroughArgs,
     check,
     json,
@@ -229,95 +154,56 @@ export function parseCliArgs(argv: string[]): CliArgs {
 
 /**
  * Merge frontmatter with CLI overrides (CLI wins)
- * Applies defaults for unset values
  */
 export function mergeFrontmatter(
   frontmatter: AgentFrontmatter,
   overrides: Partial<AgentFrontmatter>
 ): AgentFrontmatter {
-  const defaults: Partial<AgentFrontmatter> = {
-    silent: true,
-  };
-
-  // Deep merge backend-specific configs
-  const merged = { ...defaults, ...frontmatter, ...overrides };
-
-  if (frontmatter.claude || overrides.claude) {
-    merged.claude = { ...frontmatter.claude, ...overrides.claude };
-  }
-  if (frontmatter.codex || overrides.codex) {
-    merged.codex = { ...frontmatter.codex, ...overrides.codex };
-  }
-  if (frontmatter.copilot || overrides.copilot) {
-    merged.copilot = { ...frontmatter.copilot, ...overrides.copilot };
-  }
-  if (frontmatter.gemini || overrides.gemini) {
-    merged.gemini = { ...frontmatter.gemini, ...overrides.gemini };
-  }
-
-  return merged;
+  return { ...frontmatter, ...overrides };
 }
 
 function printHelp() {
   console.log(`
-Usage: <file.md> [text] [options] [-- passthrough-args]
-       --run-batch [options] < manifest.json
-       --setup
+Usage: ma <file.md> [text] [options] [-- passthrough-args]
+       ma --run-batch [options] < manifest.json
+       ma --setup
 
 Arguments:
+  file.md                 Markdown file to execute
   text                    Additional text appended to the prompt body
 
 Options:
-  --harness, -r <name>    Select backend: claude, codex, copilot, gemini (default: auto)
-  --model, -m <model>     Override AI model
-  --agent <agent>         Override custom agent (copilot)
-  --silent, -s            Suppress session metadata output (default: on)
-  --no-silent             Show session metadata output
-  --interactive, -i       Enable interactive mode
-  --allow-all-tools       Allow all tools without confirmation
-  --allow-all-paths       Allow access to any file path
-  --allow-tool <pattern>  Allow specific tool
-  --deny-tool <pattern>   Deny specific tool
-  --add-dir <dir>         Add directory to allowed list
+  --command, -c <cmd>     Command to execute (e.g., claude, codex, gemini)
   --no-cache              Skip cache and force fresh execution
   --dry-run               Show what would be executed without running
   --check                 Validate frontmatter without executing
   --json                  Output validation results as JSON (with --check)
-  --verbose, -v           Show debug info (harness, args, etc.)
+  --verbose, -v           Show debug info
   --setup                 Configure shell to run .md files directly
   --help, -h              Show this help
 
-Batch/Swarm Mode:
+Batch Mode:
   --run-batch             Read JSON manifest from stdin, dispatch parallel agents
   --concurrency <n>       Max parallel agents (default: 4)
 
 Passthrough:
-  --                      Everything after -- is passed to the harness
+  --                      Everything after -- is passed to the command
 
-Setup (treat .md as agents):
-  ma --setup              # Interactive wizard to configure your shell
-                          # After setup: ./TASK.md instead of: ma TASK.md
+Command Resolution (in priority order):
+  1. --command flag
+  2. command: in frontmatter
+  3. Inferred from filename (e.g., task.claude.md → claude)
 
-Validation:
-  ma --check task.md                    # Human-readable validation
-  ma --check task.md --json             # JSON output for piping
-  ma --check task.md --json | ma DOCTOR.md > fixed.md
-
-Batch Mode:
-  ma PLANNER.md | ma --run-batch        # Planner outputs JSON manifest
-  ma --run-batch --concurrency 8 < jobs.json
-
-Batch Manifest Format:
-  [
-    { "agent": "agents/CODER.md", "branch": "feat/api", "vars": { "task": "..." } },
-    { "agent": "agents/CODER.md", "branch": true, "model": "sonnet" }
-  ]
+Frontmatter:
+  All frontmatter keys are passed as CLI flags to the command.
+  - Strings: --key value
+  - Booleans: --key (true) or omitted (false)
+  - Arrays: --key val1 --key val2
 
 Examples:
-  DEMO.md "focus on error handling"
-  DEMO.md --harness claude --model sonnet
-  DEMO.md --harness codex --model gpt-5
-  DEMO.md --harness gemini --model gemini-3-pro-preview
-  DEMO.md -- --verbose --debug
+  ma task.claude.md "focus on error handling"
+  ma task.md --command claude
+  ma commit.gemini.md --verbose
+  ma task.md -- --model opus
 `);
 }
