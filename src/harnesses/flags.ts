@@ -10,9 +10,8 @@ import type { AgentFrontmatter } from "../types";
  * and should NOT be passed through to harnesses as CLI flags
  */
 const SYSTEM_KEYS = new Set([
-  // Harness selection (support both new and legacy)
+  // Harness selection
   "harness",
-  "runner",  // @deprecated - use harness
   // Harness-specific configs (handled separately)
   "claude", "codex", "copilot", "gemini",
   // markdown-agent specific features

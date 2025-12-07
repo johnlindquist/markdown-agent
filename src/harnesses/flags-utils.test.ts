@@ -49,13 +49,11 @@ describe("getPassthroughArgs", () => {
   test("skips system keys", () => {
     const frontmatter: AgentFrontmatter = {
       harness: "claude",
-      runner: "codex",  // deprecated
       inputs: ["file.txt"],
       context: ["ctx.md"],
     };
     const result = getPassthroughArgs(frontmatter);
     expect(result).not.toContain("--harness");
-    expect(result).not.toContain("--runner");
     expect(result).not.toContain("--inputs");
     expect(result).not.toContain("--context");
   });
@@ -331,12 +329,4 @@ describe("Flags edge cases", () => {
     expect(result).not.toContain("--skip-flag");
   });
 
-  test("runner key is not passed through (deprecated system key)", () => {
-    const frontmatter: AgentFrontmatter = {
-      runner: "codex",
-    };
-    const result = getPassthroughArgs(frontmatter);
-    expect(result).not.toContain("--runner");
-    expect(result).not.toContain("codex");
-  });
 });
