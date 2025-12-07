@@ -13,6 +13,7 @@ import { resolveCommand, buildArgs, runCommand } from "./command";
 import { runSetup } from "./setup";
 import { offerRepair } from "./repair";
 import { expandImports, hasImports } from "./imports";
+import { logger, parseLogger, templateLogger, commandLogger, contextLogger, cacheLogger, importLogger, LOG_FILE_PATH } from "./logger";
 import type { InputField } from "./types";
 import { dirname, resolve } from "path";
 
@@ -40,12 +41,16 @@ async function main() {
     noCache,
     dryRun,
     verbose,
+    debug,
     command: cliCommand,
     passthroughArgs,
     check,
     json,
     setup,
   } = parseCliArgs(process.argv);
+
+  // Log session start
+  logger.info({ filePath, debug, verbose }, "Session started");
 
   // ---------------------------------------------------------
   // SETUP MODE
@@ -139,6 +144,7 @@ async function main() {
       const parsed = parseFrontmatter(currentContent);
       baseFrontmatter = parsed.frontmatter;
       rawBody = parsed.body;
+      parseLogger.debug({ frontmatter: baseFrontmatter, bodyLength: rawBody.length }, "Frontmatter parsed");
       break;
     } catch (err) {
       const errorMessage = (err as Error).message;
@@ -189,11 +195,14 @@ async function main() {
 
   if (hasImports(rawBody)) {
     try {
+      importLogger.debug({ fileDir }, "Expanding imports");
       expandedBody = await expandImports(rawBody, fileDir, new Set(), verbose);
+      importLogger.debug({ originalLength: rawBody.length, expandedLength: expandedBody.length }, "Imports expanded");
       if (verbose) {
         console.error("[verbose] Imports expanded");
       }
     } catch (err) {
+      importLogger.error({ error: (err as Error).message }, "Import expansion failed");
       console.error(`Import error: ${(err as Error).message}`);
       process.exit(1);
     }
@@ -209,7 +218,9 @@ async function main() {
   }
 
   // Apply template substitution to body
+  templateLogger.debug({ vars: Object.keys(allTemplateVars) }, "Substituting template variables");
   const body = substituteTemplateVars(expandedBody, allTemplateVars);
+  templateLogger.debug({ bodyLength: body.length }, "Template substitution complete");
 
   // Merge frontmatter with CLI overrides
   const frontmatter = mergeFrontmatter(baseFrontmatter, overrides);
@@ -233,9 +244,11 @@ async function main() {
   let contextFiles: ContextFile[] = [];
   if (frontmatter.context) {
     const cwd = dirname(resolve(localFilePath));
+    contextLogger.debug({ patterns: frontmatter.context, cwd }, "Resolving context globs");
     contextFiles = await resolveContextGlobs(frontmatter.context, cwd);
     if (contextFiles.length > 0) {
       const stats = getContextStats(contextFiles);
+      contextLogger.debug({ fileCount: stats.fileCount, totalLines: stats.totalLines }, "Context resolved");
       console.error(`Context: ${stats.fileCount} files, ${stats.totalLines} lines`);
       contextXml = formatContextAsXml(contextFiles);
     }
@@ -261,7 +274,9 @@ async function main() {
       frontmatter,
       filePath: localFilePath,
     });
+    commandLogger.debug({ command, cliCommand, fromFilename: !cliCommand && !frontmatter.command }, "Command resolved");
   } catch (err) {
+    commandLogger.error({ error: (err as Error).message }, "Command resolution failed");
     console.error((err as Error).message);
     process.exit(1);
   }
@@ -313,14 +328,17 @@ async function main() {
   if (cacheKey && !noCache) {
     const cachedOutput = await readCache(cacheKey);
     if (cachedOutput !== null) {
+      cacheLogger.debug({ cacheKey }, "Cache hit");
       if (verbose) console.error("[verbose] Cache: hit");
       console.log(cachedOutput);
       runResult = { exitCode: 0, output: cachedOutput };
     } else {
+      cacheLogger.debug({ cacheKey }, "Cache miss");
       if (verbose) console.error("[verbose] Cache: miss");
       if (verbose) {
         console.error(`[verbose] Running: ${command} ${args.join(" ")}`);
       }
+      commandLogger.info({ command, argsCount: args.length, promptLength: finalBody.length }, "Executing command");
       runResult = await runCommand({
         command,
         args,
@@ -328,14 +346,17 @@ async function main() {
         captureOutput: useCache,
         positionalMap: frontmatter["$1"] as string | undefined,
       });
+      commandLogger.info({ exitCode: runResult.exitCode }, "Command completed");
       if (runResult.exitCode === 0 && runResult.output) {
         await writeCache(cacheKey, runResult.output);
+        cacheLogger.debug({ cacheKey }, "Result cached");
       }
     }
   } else {
     if (verbose) {
       console.error(`[verbose] Running: ${command} ${args.join(" ")}`);
     }
+    commandLogger.info({ command, argsCount: args.length, promptLength: finalBody.length }, "Executing command");
     runResult = await runCommand({
       command,
       args,
@@ -343,6 +364,7 @@ async function main() {
       captureOutput: false,
       positionalMap: frontmatter["$1"] as string | undefined,
     });
+    commandLogger.info({ exitCode: runResult.exitCode }, "Command completed");
   }
 
   // Cleanup remote temporary file
@@ -350,6 +372,7 @@ async function main() {
     await cleanupRemote(localFilePath);
   }
 
+  logger.info({ exitCode: runResult.exitCode }, "Session ended");
   process.exit(runResult.exitCode);
 }
 

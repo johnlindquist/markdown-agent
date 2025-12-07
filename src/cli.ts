@@ -9,6 +9,7 @@ export interface CliArgs {
   noCache: boolean;
   dryRun: boolean;
   verbose: boolean;
+  debug: boolean;
   command?: string;
   passthroughArgs: string[];
   check: boolean;
@@ -23,6 +24,7 @@ export const KNOWN_FLAGS = new Set([
   "--dry-run",
   "--no-cache",
   "--verbose", "-v",
+  "--debug",
   "--check",
   "--json",
   "--setup",
@@ -45,6 +47,7 @@ export function parseCliArgs(argv: string[]): CliArgs {
   let inPassthrough = false;
   let check = false;
   let json = false;
+  let debug = false;
   let setup = false;
 
   for (let i = 0; i < args.length; i++) {
@@ -100,6 +103,10 @@ export function parseCliArgs(argv: string[]): CliArgs {
         verbose = true;
         break;
 
+      case "--debug":
+        debug = true;
+        break;
+
       case "--check":
         check = true;
         break;
@@ -125,6 +132,7 @@ export function parseCliArgs(argv: string[]): CliArgs {
     noCache,
     dryRun,
     verbose,
+    debug,
     command,
     passthroughArgs,
     check,
@@ -159,6 +167,7 @@ Options:
   --check                 Validate frontmatter without executing
   --json                  Output validation results as JSON (with --check)
   --verbose, -v           Show debug info
+  --debug                 Write structured logs to ~/.markdown-agent/debug.log
   --setup                 Configure shell to run .md files directly
   --help, -h              Show this help
 
