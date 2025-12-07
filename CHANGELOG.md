@@ -1,3 +1,10 @@
+# [2.4.0](https://github.com/johnlindquist/markdown-agent/compare/v2.3.0...v2.4.0) (2025-12-07)
+
+
+### Features
+
+* always-on logging with per-agent log directories ([8b000f9](https://github.com/johnlindquist/markdown-agent/commit/8b000f97908d292c219c760ed546117ac2bcab7e))
+
 # [2.3.0](https://github.com/johnlindquist/markdown-agent/compare/v2.2.0...v2.3.0) (2025-12-07)
 
 
