@@ -99,8 +99,9 @@ bun install && bun link
 ma task.claude.md
 ma task.gemini.md
 
-# Override command via environment variable
-MA_COMMAND=claude ma task.md
+# Override command via --command flag
+ma task.md --command claude
+ma task.md -c gemini
 
 # Pass additional flags to the command
 ma task.claude.md --verbose --debug
@@ -115,8 +116,7 @@ ma task.claude.md --verbose --debug
 Commands are resolved in this priority order:
 
 1. **CLI flag**: `--command claude` or `-c claude`
-2. **Environment variable**: `MA_COMMAND=claude`
-3. **Filename pattern**: `task.claude.md` → `claude`
+2. **Filename pattern**: `task.claude.md` → `claude`
 
 If no command can be resolved, you'll get an error with instructions.
 
@@ -426,8 +426,7 @@ Usage: ma <file.md> [any flags for the command]
 
 Command resolution:
   1. --command flag (e.g., ma task.md --command claude)
-  2. MA_COMMAND env var (e.g., MA_COMMAND=claude ma task.md)
-  3. Filename pattern (e.g., task.claude.md → claude)
+  2. Filename pattern (e.g., task.claude.md → claude)
 
 All frontmatter keys are passed as CLI flags to the command.
 Global defaults can be set in ~/.markdown-agent/config.yaml
@@ -438,7 +437,6 @@ Examples:
   ma commit.gemini.md
   ma task.md --command claude
   ma task.md -c gemini
-  MA_COMMAND=claude ma task.md
 
 Without a file:
   ma --setup    Configure shell to run .md files directly
@@ -450,7 +448,6 @@ Without a file:
 
 | Variable | Description |
 |----------|-------------|
-| `MA_COMMAND` | Override command (e.g., `MA_COMMAND=claude ma task.md`) |
 | `MA_FORCE_CONTEXT` | Set to `1` to disable the 100k token limit for glob imports |
 | `NODE_ENV` | Controls which `.env.[NODE_ENV]` file is loaded (default: `development`) |
 

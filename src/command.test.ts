@@ -1,4 +1,4 @@
-import { expect, test, describe, beforeEach, afterEach } from "bun:test";
+import { expect, test, describe } from "bun:test";
 import { parseCommandFromFilename, resolveCommand, buildArgs, extractPositionalMappings, extractEnvVars } from "./command";
 
 describe("parseCommandFromFilename", () => {
@@ -25,29 +25,9 @@ describe("parseCommandFromFilename", () => {
 });
 
 describe("resolveCommand", () => {
-  const originalEnv = process.env.MA_COMMAND;
-
-  beforeEach(() => {
-    delete process.env.MA_COMMAND;
-  });
-
-  afterEach(() => {
-    if (originalEnv !== undefined) {
-      process.env.MA_COMMAND = originalEnv;
-    } else {
-      delete process.env.MA_COMMAND;
-    }
-  });
-
-  test("MA_COMMAND env var takes priority over filename", () => {
-    process.env.MA_COMMAND = "gemini";
-    const result = resolveCommand("task.claude.md");
-    expect(result).toBe("gemini");
-  });
-
-  test("filename inference works when no env var", () => {
-    const result = resolveCommand("task.claude.md");
-    expect(result).toBe("claude");
+  test("resolves command from filename pattern", () => {
+    expect(resolveCommand("task.claude.md")).toBe("claude");
+    expect(resolveCommand("review.gemini.md")).toBe("gemini");
   });
 
   test("throws when no command can be resolved", () => {

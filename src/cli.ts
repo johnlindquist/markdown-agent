@@ -58,12 +58,13 @@ export function parseCliArgs(argv: string[]): CliArgs {
 function printHelp() {
   console.log(`
 Usage: ma <file.md> [any flags for the command]
+       ma <file.md> --command <cmd>
        ma --setup
        ma --logs
        ma --help
 
 Command resolution:
-  1. MA_COMMAND env var (e.g., MA_COMMAND=claude ma task.md)
+  1. --command flag (e.g., ma task.md --command claude)
   2. Filename pattern (e.g., task.claude.md → claude)
 
 All frontmatter keys are passed as CLI flags to the command.
@@ -73,7 +74,8 @@ Examples:
   ma task.claude.md -p "print mode"
   ma task.claude.md --model opus --verbose
   ma commit.gemini.md
-  MA_COMMAND=claude ma task.md
+  ma task.md --command claude
+  ma task.md -c gemini
 
 Config file example (~/.markdown-agent/config.yaml):
   commands:

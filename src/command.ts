@@ -36,25 +36,17 @@ export function parseCommandFromFilename(filePath: string): string | undefined {
 }
 
 /**
- * Resolve which command to use
- * Priority: MA_COMMAND env var > filename inference
+ * Resolve command from filename pattern
+ * Note: --command flag is handled in index.ts before this is called
  */
 export function resolveCommand(filePath: string): string {
-  // 1. MA_COMMAND environment variable
-  const fromEnv = process.env.MA_COMMAND;
-  if (fromEnv) {
-    return fromEnv;
-  }
-
-  // 2. Infer from filename
   const fromFilename = parseCommandFromFilename(filePath);
   if (fromFilename) {
     return fromFilename;
   }
 
-  // 3. No command specified - error
   throw new Error(
-    "No command specified. Set MA_COMMAND env var, " +
+    "No command specified. Use --command flag, " +
     "or name your file like 'task.claude.md'"
   );
 }
