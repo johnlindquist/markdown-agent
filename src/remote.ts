@@ -6,6 +6,7 @@
 import { mkdtemp, rm } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
+import { resilientFetch } from "./fetch";
 
 export interface RemoteResult {
   success: boolean;
@@ -63,7 +64,7 @@ export async function fetchRemote(url: string): Promise<RemoteResult> {
     const rawUrl = toRawUrl(url);
     console.log(`Fetching: ${rawUrl}`);
 
-    const response = await fetch(rawUrl, {
+    const response = await resilientFetch(rawUrl, {
       headers: {
         "User-Agent": "markdown-agent/1.0",
         "Accept": "text/plain, text/markdown, */*",

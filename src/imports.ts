@@ -2,6 +2,7 @@ import { resolve, dirname, relative, basename } from "path";
 import { homedir } from "os";
 import { Glob } from "bun";
 import ignore from "ignore";
+import { resilientFetch } from "./fetch";
 
 /**
  * Expand markdown imports, URL imports, and command inlines
@@ -319,7 +320,7 @@ async function processUrlImport(
   }
 
   try {
-    const response = await fetch(url, {
+    const response = await resilientFetch(url, {
       headers: {
         "Accept": "text/markdown, application/json, text/plain, */*",
         "User-Agent": "markdown-agent/1.0",
