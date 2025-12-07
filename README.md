@@ -114,10 +114,52 @@ ma task.claude.md --verbose --debug
 
 Commands are resolved in this priority order:
 
-1. **Environment variable**: `MA_COMMAND=claude`
-2. **Filename pattern**: `task.claude.md` → `claude`
+1. **CLI flag**: `--command claude` or `-c claude`
+2. **Environment variable**: `MA_COMMAND=claude`
+3. **Filename pattern**: `task.claude.md` → `claude`
 
 If no command can be resolved, you'll get an error with instructions.
+
+---
+
+## Flag Hijacking
+
+Some CLI flags are "hijacked" by markdown-agent—they're consumed and never passed to the underlying command. This allows generic markdown files without command names to be executed.
+
+### `--command` / `-c`
+
+Override the command for any markdown file:
+
+```bash
+# Run a generic .md file with any command
+ma task.md --command claude
+ma task.md -c gemini
+
+# Override the filename-inferred command
+ma task.claude.md --command gemini  # Runs gemini, not claude
+```
+
+### `$varname` Fields
+
+Frontmatter fields starting with `$` (except `$1`, `$2`...) hijack their corresponding CLI flags:
+
+```yaml
+---
+$feature_name: Authentication   # Default value
+$target_dir: src/features       # Default value
+---
+Build {{ feature_name }} in {{ target_dir }}.
+```
+
+```bash
+# Use defaults
+ma create.claude.md
+
+# Override with CLI flags (hijacked, not passed to command)
+ma create.claude.md --feature_name "Payments" --target_dir "src/billing"
+```
+
+The `--feature_name` and `--target_dir` flags are consumed by markdown-agent for template substitution—they won't be passed to the command.
 
 ---
 
@@ -377,13 +419,15 @@ Environment variables are available:
 
 ```
 Usage: ma <file.md> [any flags for the command]
+       ma <file.md> --command <cmd>
        ma --setup
        ma --logs
        ma --help
 
 Command resolution:
-  1. MA_COMMAND env var (e.g., MA_COMMAND=claude ma task.md)
-  2. Filename pattern (e.g., task.claude.md → claude)
+  1. --command flag (e.g., ma task.md --command claude)
+  2. MA_COMMAND env var (e.g., MA_COMMAND=claude ma task.md)
+  3. Filename pattern (e.g., task.claude.md → claude)
 
 All frontmatter keys are passed as CLI flags to the command.
 Global defaults can be set in ~/.markdown-agent/config.yaml
@@ -392,6 +436,8 @@ Examples:
   ma task.claude.md -p "print mode"
   ma task.claude.md --model opus --verbose
   ma commit.gemini.md
+  ma task.md --command claude
+  ma task.md -c gemini
   MA_COMMAND=claude ma task.md
 
 Without a file:

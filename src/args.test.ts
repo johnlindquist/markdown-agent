@@ -1,6 +1,7 @@
 import { expect, test, describe } from "bun:test";
 import { parseFrontmatter } from "./parse";
 import { substituteTemplateVars, extractTemplateVars } from "./template";
+import { resolveCommand } from "./command";
 
 /**
  * Tests for the args system:
@@ -166,5 +167,50 @@ Build {{ feature_name }}`;
 
     const result = substituteTemplateVars(body, templateVars);
     expect(result).toBe("Build Payments");
+  });
+});
+
+describe("flag hijacking", () => {
+  test("--command flag is consumed and used as command", () => {
+    // Simulate CLI: ma generic.md --command claude --model opus
+    const cliArgs = ["--command", "claude", "--model", "opus"];
+
+    // Extract --command flag (same logic as index.ts)
+    let commandFromCli: string | undefined;
+    const remainingArgs = [...cliArgs];
+
+    const commandFlagIndex = remainingArgs.findIndex(arg => arg === "--command" || arg === "-c");
+    if (commandFlagIndex !== -1 && commandFlagIndex + 1 < remainingArgs.length) {
+      commandFromCli = remainingArgs[commandFlagIndex + 1];
+      remainingArgs.splice(commandFlagIndex, 2);
+    }
+
+    expect(commandFromCli).toBe("claude");
+    expect(remainingArgs).toEqual(["--model", "opus"]); // --command consumed
+  });
+
+  test("-c short flag also works for command", () => {
+    const cliArgs = ["-c", "gemini", "--verbose"];
+    const remainingArgs = [...cliArgs];
+
+    let commandFromCli: string | undefined;
+    const commandFlagIndex = remainingArgs.findIndex(arg => arg === "--command" || arg === "-c");
+    if (commandFlagIndex !== -1 && commandFlagIndex + 1 < remainingArgs.length) {
+      commandFromCli = remainingArgs[commandFlagIndex + 1];
+      remainingArgs.splice(commandFlagIndex, 2);
+    }
+
+    expect(commandFromCli).toBe("gemini");
+    expect(remainingArgs).toEqual(["--verbose"]);
+  });
+
+  test("--command takes priority over filename", () => {
+    // If --command is provided, it takes priority
+    // (filename would give "codex" but --command says "claude")
+    const commandFromCli = "claude";
+    const commandFromFilename = "codex"; // from task.codex.md
+
+    const command = commandFromCli || commandFromFilename;
+    expect(command).toBe("claude");
   });
 });

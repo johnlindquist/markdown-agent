@@ -76,11 +76,27 @@ async function main() {
   const { frontmatter: baseFrontmatter, body: rawBody } = parseFrontmatter(content);
   getParseLogger().debug({ frontmatter: baseFrontmatter, bodyLength: rawBody.length }, "Frontmatter parsed");
 
-  // Resolve command (from env var or filename)
+  // Check for --command flag in CLI args (consumed, not passed to command)
+  // This allows: ma generic.md --command claude
+  let remainingArgs = [...passthroughArgs];
+  let commandFromCli: string | undefined;
+
+  const commandFlagIndex = remainingArgs.findIndex(arg => arg === "--command" || arg === "-c");
+  if (commandFlagIndex !== -1 && commandFlagIndex + 1 < remainingArgs.length) {
+    commandFromCli = remainingArgs[commandFlagIndex + 1];
+    remainingArgs.splice(commandFlagIndex, 2); // Consume --command and its value
+  }
+
+  // Resolve command: CLI --command > MA_COMMAND env > filename
   let command: string;
   try {
-    command = resolveCommand(localFilePath);
-    getCommandLogger().debug({ command }, "Command resolved");
+    if (commandFromCli) {
+      command = commandFromCli;
+      getCommandLogger().debug({ command, source: "cli" }, "Command from --command flag");
+    } else {
+      command = resolveCommand(localFilePath);
+      getCommandLogger().debug({ command }, "Command resolved");
+    }
   } catch (err) {
     getCommandLogger().error({ error: (err as Error).message }, "Command resolution failed");
     console.error((err as Error).message);
@@ -103,7 +119,6 @@ async function main() {
 
   // Consume named positional arguments from CLI
   let templateVars: Record<string, string> = {};
-  let remainingArgs = [...passthroughArgs];
 
   if (frontmatter.args && Array.isArray(frontmatter.args)) {
     const requiredArgs = frontmatter.args;
