@@ -31,6 +31,7 @@
   },
   "dependencies": {
     "@inquirer/prompts": "^8.0.2",
+    "ignore": "^7.0.5",
     "js-yaml": "^4.1.1",
     "liquidjs": "^10.24.0",
     "pino": "^10.1.0",

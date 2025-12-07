@@ -21,9 +21,6 @@ export interface AgentFrontmatter {
   /** Wizard mode inputs - collect values interactively */
   inputs?: InputField[];
 
-  /** Context globs - files to include in prompt */
-  context?: string | string[];
-
   /** Prerequisites to check before running */
   requires?: Prerequisites;
 

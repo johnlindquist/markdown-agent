@@ -44,11 +44,19 @@ bun run ma task.claude.md
 
 - **`types.ts`** - Core TypeScript interfaces
   - `AgentFrontmatter`: Simple interface with system keys + passthrough
-  - System keys: `command`, `$1`, `inputs`, `context`, `cache`, `requires`
+  - System keys: `command`, `$1`, `inputs`, `cache`, `requires`
 
 - **`schema.ts`** - Minimal Zod validation (system keys only, rest passthrough)
 
-- **`imports.ts`** - File imports (`@./path.md`) and command inlines (`` !`cmd` ``)
+- **`imports.ts`** - File imports with advanced features:
+  - Basic: `@./path.md` - inline file contents
+  - Globs: `@./src/**/*.ts` - multiple files (respects .gitignore)
+  - Line ranges: `@./file.ts:10-50` - extract specific lines
+  - Symbols: `@./file.ts#InterfaceName` - extract TypeScript symbols
+  - Commands: `` !`cmd` `` - inline command output
+  - URLs: `@https://example.com/file.md` - fetch remote content
+
+- **`env.ts`** - Environment variable loading from .env files
 
 - **`template.ts`** - LiquidJS-powered template engine for variable substitution
 

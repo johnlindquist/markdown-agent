@@ -4,14 +4,12 @@
  */
 
 import type { AgentFrontmatter } from "./types";
-import type { ContextFile } from "./context";
 
 export interface DryRunInfo {
   frontmatter: AgentFrontmatter;
   prompt: string;
   harnessArgs: string[];
   harnessName: string;
-  contextFiles: ContextFile[];
   templateVars: Record<string, string>;
 }
 
@@ -52,17 +50,6 @@ export function formatDryRun(info: DryRunInfo): string {
     sections.push("");
   }
 
-  // Context files
-  if (info.contextFiles.length > 0) {
-    sections.push("📁 CONTEXT FILES");
-    sections.push("───────────────────────────────────────────────────────────────");
-    for (const file of info.contextFiles) {
-      const lines = file.content.split("\n").length;
-      sections.push(`  ${file.relativePath} (${lines} lines)`);
-    }
-    sections.push("");
-  }
-
   // Command
   sections.push(`🤖 COMMAND`);
   sections.push("───────────────────────────────────────────────────────────────");
@@ -88,7 +75,7 @@ export function formatDryRun(info: DryRunInfo): string {
   sections.push("───────────────────────────────────────────────────────────────");
   sections.push(`  Command: ${command}`);
   // Show all frontmatter keys that aren't system keys
-  const systemKeys = new Set(["command", "inputs", "context", "requires", "cache"]);
+  const systemKeys = new Set(["command", "inputs", "requires", "cache"]);
   for (const [key, value] of Object.entries(info.frontmatter)) {
     if (systemKeys.has(key)) continue;
     if (value === undefined || value === null) continue;

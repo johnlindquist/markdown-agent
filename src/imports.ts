@@ -1,11 +1,16 @@
-import { resolve, dirname } from "path";
+import { resolve, dirname, relative, basename } from "path";
 import { homedir } from "os";
+import { Glob } from "bun";
+import ignore from "ignore";
 
 /**
  * Expand markdown imports, URL imports, and command inlines
  *
- * Supports three syntaxes:
+ * Supports multiple syntaxes:
  * - @~/path/to/file.md or @./relative/path.md - Inline file contents
+ * - @./src/**\/*.ts - Glob patterns (respects .gitignore)
+ * - @./file.ts:10-50 - Line range extraction
+ * - @./file.ts#SymbolName - Symbol extraction (interface, function, class, type, const)
  * - @https://example.com/docs or @http://... - Fetch URL content (markdown/json only)
  * - !`command` - Execute command and inline stdout/stderr
  *
@@ -15,6 +20,11 @@ import { homedir } from "os";
 
 /** Track files being processed to detect circular imports */
 type ImportStack = Set<string>;
+
+/** Maximum token count before warning (approx 4 chars per token) */
+const MAX_TOKENS = 100_000;
+const CHARS_PER_TOKEN = 4;
+const MAX_CHARS = MAX_TOKENS * CHARS_PER_TOKEN;
 
 /**
  * Expand a path that may start with ~ to use home directory
@@ -42,8 +52,181 @@ function resolveImportPath(importPath: string, currentFileDir: string): string {
 }
 
 /**
- * Pattern to match @filepath imports
+ * Check if a path contains glob characters
+ */
+function isGlobPattern(path: string): boolean {
+  return path.includes("*") || path.includes("?") || path.includes("[");
+}
+
+/**
+ * Parse import path for line range syntax: @./file.ts:10-50
+ */
+function parseLineRange(path: string): { path: string; start?: number; end?: number } {
+  const match = path.match(/^(.+):(\d+)-(\d+)$/);
+  if (match) {
+    return {
+      path: match[1],
+      start: parseInt(match[2], 10),
+      end: parseInt(match[3], 10),
+    };
+  }
+  return { path };
+}
+
+/**
+ * Parse import path for symbol extraction: @./file.ts#SymbolName
+ */
+function parseSymbolExtraction(path: string): { path: string; symbol?: string } {
+  const match = path.match(/^(.+)#([a-zA-Z_$][a-zA-Z0-9_$]*)$/);
+  if (match) {
+    return {
+      path: match[1],
+      symbol: match[2],
+    };
+  }
+  return { path };
+}
+
+/**
+ * Extract lines from content by range
+ */
+function extractLines(content: string, start: number, end: number): string {
+  const lines = content.split("\n");
+  // Convert to 0-indexed, clamp to valid range
+  const startIdx = Math.max(0, start - 1);
+  const endIdx = Math.min(lines.length, end);
+  return lines.slice(startIdx, endIdx).join("\n");
+}
+
+/**
+ * Extract a symbol definition from TypeScript/JavaScript content
+ * Supports: interface, type, function, class, const, let, var, enum
+ */
+function extractSymbol(content: string, symbolName: string): string {
+  const lines = content.split("\n");
+
+  // Patterns to match symbol declarations
+  const patterns = [
+    // interface Name { ... }
+    new RegExp(`^(export\\s+)?interface\\s+${symbolName}\\s*(extends\\s+[^{]+)?\\{`),
+    // type Name = ...
+    new RegExp(`^(export\\s+)?type\\s+${symbolName}\\s*(<[^>]+>)?\\s*=`),
+    // function Name(...) { ... }
+    new RegExp(`^(export\\s+)?(async\\s+)?function\\s+${symbolName}\\s*(<[^>]+>)?\\s*\\(`),
+    // class Name { ... }
+    new RegExp(`^(export\\s+)?(abstract\\s+)?class\\s+${symbolName}\\s*(extends\\s+[^{]+)?(implements\\s+[^{]+)?\\{`),
+    // const/let/var Name = ...
+    new RegExp(`^(export\\s+)?(const|let|var)\\s+${symbolName}\\s*(:[^=]+)?\\s*=`),
+    // enum Name { ... }
+    new RegExp(`^(export\\s+)?enum\\s+${symbolName}\\s*\\{`),
+  ];
+
+  let startLine = -1;
+  let braceDepth = 0;
+  let parenDepth = 0;
+  let inString = false;
+  let stringChar = "";
+  let foundDeclaration = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+
+    // Check if this line starts the symbol we're looking for
+    if (startLine === -1) {
+      for (const pattern of patterns) {
+        if (pattern.test(line)) {
+          startLine = i;
+          foundDeclaration = true;
+          break;
+        }
+      }
+    }
+
+    if (startLine !== -1) {
+      // Count braces/parens to find the end of the declaration
+      for (let j = 0; j < lines[i].length; j++) {
+        const char = lines[i][j];
+        const prevChar = j > 0 ? lines[i][j - 1] : "";
+
+        // Handle string literals
+        if (!inString && (char === '"' || char === "'" || char === "`")) {
+          inString = true;
+          stringChar = char;
+        } else if (inString && char === stringChar && prevChar !== "\\") {
+          inString = false;
+        }
+
+        if (!inString) {
+          if (char === "{") braceDepth++;
+          else if (char === "}") braceDepth--;
+          else if (char === "(") parenDepth++;
+          else if (char === ")") parenDepth--;
+        }
+      }
+
+      // Check if we've closed all braces (for block declarations)
+      if (foundDeclaration && braceDepth === 0 && parenDepth === 0) {
+        // For type aliases, we need to check for semicolon or end of statement
+        const currentLine = lines[i].trim();
+        if (currentLine.endsWith(";") || currentLine.endsWith("}") ||
+            (i + 1 < lines.length && !lines[i + 1].trim().startsWith("."))) {
+          return lines.slice(startLine, i + 1).join("\n");
+        }
+      }
+    }
+  }
+
+  if (startLine !== -1) {
+    // Return everything from start to end if we couldn't find proper closure
+    return lines.slice(startLine).join("\n");
+  }
+
+  throw new Error(`Symbol "${symbolName}" not found in file`);
+}
+
+/**
+ * Load .gitignore patterns from directory and parents
+ */
+async function loadGitignore(dir: string): Promise<ReturnType<typeof ignore>> {
+  const ig = ignore();
+
+  // Always ignore common patterns
+  ig.add([
+    ".git",
+    "node_modules",
+    ".DS_Store",
+    "*.log",
+  ]);
+
+  // Walk up to find .gitignore files
+  let currentDir = dir;
+  const root = resolve("/");
+
+  while (currentDir !== root) {
+    const gitignorePath = resolve(currentDir, ".gitignore");
+    const file = Bun.file(gitignorePath);
+
+    if (await file.exists()) {
+      const content = await file.text();
+      ig.add(content.split("\n").filter(line => line.trim() && !line.startsWith("#")));
+    }
+
+    // Stop at git root
+    const gitDir = resolve(currentDir, ".git");
+    if (await Bun.file(gitDir).exists()) {
+      break;
+    }
+
+    currentDir = dirname(currentDir);
+  }
+
+  return ig;
+}
+
+/**
+ * Pattern to match @filepath imports (including globs, line ranges, and symbols)
  * Matches: @~/path/to/file.md, @./relative/path.md, @/absolute/path.md
+ * Also: @./src/**\/*.ts, @./file.ts:10-50, @./file.ts#Symbol
  * The path continues until whitespace or end of line
  */
 const FILE_IMPORT_PATTERN = /@(~?[.\/][^\s]+)/g;
@@ -175,7 +358,84 @@ async function processUrlImport(
 }
 
 /**
- * Process a single file import
+ * Format files as XML for LLM consumption
+ */
+function formatFilesAsXml(files: Array<{ path: string; content: string }>): string {
+  return files.map(file => {
+    const name = basename(file.path)
+      .replace(/\.[^.]+$/, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .replace(/^(\d)/, "_$1") || "file";
+    return `<${name} path="${file.path}">\n${file.content}\n</${name}>`;
+  }).join("\n\n");
+}
+
+/**
+ * Process a glob import pattern
+ */
+async function processGlobImport(
+  pattern: string,
+  currentFileDir: string,
+  verbose: boolean
+): Promise<string> {
+  const resolvedPattern = expandTilde(pattern);
+  const baseDir = resolvedPattern.startsWith("/") ? "/" : currentFileDir;
+
+  // For relative patterns, we need to resolve from the current directory
+  const globPattern = resolvedPattern.startsWith("/")
+    ? resolvedPattern
+    : resolve(currentFileDir, resolvedPattern).replace(currentFileDir + "/", "");
+
+  if (verbose) {
+    console.error(`[imports] Glob pattern: ${globPattern} in ${currentFileDir}`);
+  }
+
+  // Load gitignore
+  const ig = await loadGitignore(currentFileDir);
+
+  // Collect matching files
+  const glob = new Glob(resolvedPattern.startsWith("/") ? resolvedPattern : pattern.replace(/^\.\//, ""));
+  const files: Array<{ path: string; content: string }> = [];
+  let totalChars = 0;
+
+  for await (const file of glob.scan({ cwd: currentFileDir, absolute: true, onlyFiles: true })) {
+    // Check gitignore
+    const relativePath = relative(currentFileDir, file);
+    if (ig.ignores(relativePath)) {
+      continue;
+    }
+
+    const bunFile = Bun.file(file);
+    const content = await bunFile.text();
+    totalChars += content.length;
+
+    files.push({ path: relativePath, content });
+  }
+
+  // Sort by path for consistent ordering
+  files.sort((a, b) => a.path.localeCompare(b.path));
+
+  // Check token limit
+  const estimatedTokens = Math.ceil(totalChars / CHARS_PER_TOKEN);
+  if (totalChars > MAX_CHARS && !process.env.MA_FORCE_CONTEXT) {
+    throw new Error(
+      `Glob import "${pattern}" would include ~${estimatedTokens.toLocaleString()} tokens (${files.length} files), ` +
+      `which exceeds the ${MAX_TOKENS.toLocaleString()} token limit.\n` +
+      `To override this limit, set the MA_FORCE_CONTEXT=1 environment variable.`
+    );
+  }
+
+  if (verbose) {
+    console.error(`[imports] Glob matched ${files.length} files (~${estimatedTokens.toLocaleString()} tokens)`);
+  }
+
+  return formatFilesAsXml(files);
+}
+
+/**
+ * Process a single file import (with optional line range or symbol extraction)
  */
 async function processFileImport(
   importPath: string,
@@ -183,6 +443,48 @@ async function processFileImport(
   stack: ImportStack,
   verbose: boolean
 ): Promise<string> {
+  // Check for glob pattern first
+  if (isGlobPattern(importPath)) {
+    return processGlobImport(importPath, currentFileDir, verbose);
+  }
+
+  // Check for symbol extraction syntax
+  const symbolParsed = parseSymbolExtraction(importPath);
+  if (symbolParsed.symbol) {
+    const resolvedPath = resolveImportPath(symbolParsed.path, currentFileDir);
+
+    const file = Bun.file(resolvedPath);
+    if (!await file.exists()) {
+      throw new Error(`Import not found: ${symbolParsed.path} (resolved to ${resolvedPath})`);
+    }
+
+    if (verbose) {
+      console.error(`[imports] Extracting symbol "${symbolParsed.symbol}" from: ${symbolParsed.path}`);
+    }
+
+    const content = await file.text();
+    return extractSymbol(content, symbolParsed.symbol);
+  }
+
+  // Check for line range syntax
+  const rangeParsed = parseLineRange(importPath);
+  if (rangeParsed.start !== undefined && rangeParsed.end !== undefined) {
+    const resolvedPath = resolveImportPath(rangeParsed.path, currentFileDir);
+
+    const file = Bun.file(resolvedPath);
+    if (!await file.exists()) {
+      throw new Error(`Import not found: ${rangeParsed.path} (resolved to ${resolvedPath})`);
+    }
+
+    if (verbose) {
+      console.error(`[imports] Loading lines ${rangeParsed.start}-${rangeParsed.end} from: ${rangeParsed.path}`);
+    }
+
+    const content = await file.text();
+    return extractLines(content, rangeParsed.start, rangeParsed.end);
+  }
+
+  // Regular file import
   const resolvedPath = resolveImportPath(importPath, currentFileDir);
 
   // Check for circular imports

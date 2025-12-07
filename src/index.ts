@@ -4,7 +4,6 @@ import { parseCliArgs, mergeFrontmatter } from "./cli";
 import { safeParseFrontmatter } from "./schema";
 import { substituteTemplateVars, extractTemplateVars } from "./template";
 import { promptInputs, validateInputField } from "./inputs";
-import { resolveContextGlobs, formatContextAsXml, getContextStats, type ContextFile } from "./context";
 import { generateCacheKey, readCache, writeCache } from "./cache";
 import { validatePrerequisites, handlePrerequisiteFailure } from "./prerequisites";
 import { formatDryRun, type DryRunInfo } from "./dryrun";
@@ -13,9 +12,10 @@ import { resolveCommand, buildArgs, runCommand } from "./command";
 import { runSetup } from "./setup";
 import { offerRepair } from "./repair";
 import { expandImports, hasImports } from "./imports";
-import { initLogger, getLogger, getParseLogger, getTemplateLogger, getCommandLogger, getContextLogger, getCacheLogger, getImportLogger, getLogDir, listLogDirs } from "./logger";
+import { loadEnvFiles } from "./env";
+import { initLogger, getLogger, getParseLogger, getTemplateLogger, getCommandLogger, getCacheLogger, getImportLogger, getLogDir, listLogDirs } from "./logger";
 import type { InputField } from "./types";
-import { dirname, resolve } from "path";
+import { dirname, resolve, join } from "path";
 
 /**
  * Read stdin if it's being piped (not a TTY)
@@ -104,9 +104,13 @@ async function main() {
     process.exit(1);
   }
 
+  // Load .env files from the markdown file's directory
+  const fileDir = dirname(resolve(localFilePath));
+  const envLoaded = await loadEnvFiles(fileDir, verbose);
+
   // Initialize logger for this agent
   const logger = initLogger(localFilePath);
-  logger.info({ filePath: localFilePath, verbose }, "Session started");
+  logger.info({ filePath: localFilePath, verbose, envFilesLoaded: envLoaded }, "Session started");
 
   // Read stdin if piped
   const stdinContent = await readStdin();
@@ -258,26 +262,8 @@ async function main() {
     }
   }
 
-  // Resolve context globs and include file contents
-  let contextXml = "";
-  let contextFiles: ContextFile[] = [];
-  if (frontmatter.context) {
-    const cwd = dirname(resolve(localFilePath));
-    getContextLogger().debug({ patterns: frontmatter.context, cwd }, "Resolving context globs");
-    contextFiles = await resolveContextGlobs(frontmatter.context, cwd);
-    if (contextFiles.length > 0) {
-      const stats = getContextStats(contextFiles);
-      getContextLogger().debug({ fileCount: stats.fileCount, totalLines: stats.totalLines }, "Context resolved");
-      console.error(`Context: ${stats.fileCount} files, ${stats.totalLines} lines`);
-      contextXml = formatContextAsXml(contextFiles);
-    }
-  }
-
-  // Build final prompt with context, stdin, and appended text
+  // Build final prompt with stdin and appended text
   let finalBody = body;
-  if (contextXml) {
-    finalBody = `${contextXml}\n\n${finalBody}`;
-  }
   if (stdinContent) {
     finalBody = `<stdin>\n${stdinContent}\n</stdin>\n\n${finalBody}`;
   }
@@ -310,9 +296,6 @@ async function main() {
   // Verbose output
   if (verbose) {
     console.error(`[verbose] Command: ${command}`);
-    if (contextFiles.length > 0) {
-      console.error(`[verbose] Context files: ${contextFiles.length}`);
-    }
     if (args.length > 0) {
       console.error(`[verbose] Args: ${args.join(" ")}`);
     }
@@ -325,7 +308,6 @@ async function main() {
       prompt: finalBody,
       harnessArgs: args,
       harnessName: command,
-      contextFiles,
       templateVars: allTemplateVars,
     };
     console.log(formatDryRun(dryRunInfo));
@@ -339,7 +321,7 @@ async function main() {
   // Caching
   const useCache = frontmatter.cache === true && !noCache;
   const cacheKey = useCache
-    ? generateCacheKey({ frontmatter, body: finalBody, contextFiles })
+    ? generateCacheKey({ frontmatter, body: finalBody })
     : null;
 
   let runResult: { exitCode: number; output: string };

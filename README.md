@@ -18,9 +18,10 @@ Markdown files become first-class CLI commands. Write a prompt in markdown, run 
 # review.claude.md
 ---
 model: opus
-context: ["src/**/*.ts"]
 ---
 Review this code for bugs and suggest improvements.
+
+@./src/**/*.ts
 ```
 
 ```bash
@@ -138,7 +139,6 @@ If no command can be resolved, you'll get an error with instructions.
 | `command` | string | Command to execute (e.g., `claude`, `gemini`, `codex`) |
 | `$1` | string | Map body to a flag instead of positional (e.g., `$1: prompt` → `--prompt <body>`) |
 | `inputs` | InputField[] | Wizard mode interactive prompts |
-| `context` | string \| string[] | Glob patterns for files to include |
 | `cache` | boolean | Enable result caching |
 | `requires` | object | Prerequisites: `bin`, `env` arrays |
 
@@ -217,19 +217,6 @@ Explain this code.
 
 This runs: `copilot --model gpt-4.1 --prompt "Explain this code." --silent`
 
-### With Context Files
-
-```markdown
-# review.claude.md
----
-model: sonnet
-context:
-  - src/**/*.ts
-  - "!**/*.test.ts"
----
-Review the TypeScript files above for potential issues.
-```
-
 ### Wizard Mode with Inputs
 
 ```markdown
@@ -275,6 +262,63 @@ Now review this code:
 
 Imports are recursive—imported files can have their own `@` imports.
 
+### Glob Imports
+
+Use glob patterns to include multiple files at once:
+
+```markdown
+---
+command: claude
+---
+Review all TypeScript files in src:
+@./src/**/*.ts
+```
+
+Glob imports:
+- Respect `.gitignore` automatically
+- Include common exclusions (`node_modules`, `.git`, etc.)
+- Are limited to ~100,000 tokens by default
+- Set `MA_FORCE_CONTEXT=1` to override the token limit
+
+Files are formatted as XML with path attributes:
+
+```xml
+<api path="src/api.ts">
+...file content...
+</api>
+
+<utils path="src/utils.ts">
+...file content...
+</utils>
+```
+
+### Line Range Imports
+
+Extract specific lines from a file:
+
+```markdown
+@./src/api.ts:10-50
+```
+
+This imports only lines 10-50 from the file.
+
+### Symbol Extraction
+
+Extract specific TypeScript/JavaScript symbols (interfaces, types, functions, classes, etc.):
+
+```markdown
+@./src/types.ts#UserInterface
+@./src/api.ts#fetchUser
+```
+
+Supported symbols:
+- `interface Name { ... }`
+- `type Name = ...`
+- `function Name(...) { ... }`
+- `class Name { ... }`
+- `const/let/var Name = ...`
+- `enum Name { ... }`
+
 ### Command Inlines
 
 Use `` !`command` `` to execute a shell command and inline its output:
@@ -289,6 +333,42 @@ Recent commits:
 
 Based on the above, suggest what to work on next.
 ```
+
+### URL Imports
+
+Fetch content from URLs (markdown and JSON only):
+
+```markdown
+@https://raw.githubusercontent.com/user/repo/main/README.md
+```
+
+---
+
+## Environment Variables
+
+markdown-agent automatically loads `.env` files from the markdown file's directory.
+
+### Loading Order
+
+Files are loaded in order (later files override earlier):
+
+1. `.env` - Base environment
+2. `.env.local` - Local overrides (not committed)
+3. `.env.development` / `.env.production` - Environment-specific
+4. `.env.development.local` / `.env.production.local` - Environment-specific local
+
+### Example
+
+```
+my-agents/
+├── .env                    # API_KEY=default
+├── .env.local              # API_KEY=my-secret (gitignored)
+└── review.claude.md
+```
+
+Environment variables are available:
+- In command inlines: `` !`echo $API_KEY` ``
+- In the spawned command's environment
 
 ---
 
@@ -322,6 +402,13 @@ Examples:
   ma commit.gemini.md --verbose
   ma task.md -- --model opus --debug
 ```
+
+### Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `MA_FORCE_CONTEXT` | Set to `1` to disable the 100k token limit for glob imports |
+| `NODE_ENV` | Controls which `.env.[NODE_ENV]` file is loaded (default: `development`) |
 
 ---
 

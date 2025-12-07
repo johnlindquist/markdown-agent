@@ -25,12 +25,6 @@ export const inputFieldSchema = z.object({
   { message: "Select inputs require a non-empty choices array" }
 );
 
-/** String or array of strings */
-const stringOrArraySchema = z.union([
-  z.string(),
-  z.array(z.string()),
-]).optional();
-
 /** Main frontmatter schema - minimal, passthrough everything else */
 export const frontmatterSchema = z.object({
   // Command to execute
@@ -38,9 +32,6 @@ export const frontmatterSchema = z.object({
 
   // Wizard mode inputs
   inputs: z.array(inputFieldSchema).optional(),
-
-  // Context globs
-  context: stringOrArraySchema,
 
   // Caching
   cache: z.boolean().optional(),

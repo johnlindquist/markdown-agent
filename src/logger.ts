@@ -115,10 +115,6 @@ export function getCommandLogger(): Logger {
   return currentLogger.child({ module: "command" });
 }
 
-export function getContextLogger(): Logger {
-  return currentLogger.child({ module: "context" });
-}
-
 export function getCacheLogger(): Logger {
   return currentLogger.child({ module: "cache" });
 }

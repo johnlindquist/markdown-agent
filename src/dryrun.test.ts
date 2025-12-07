@@ -8,7 +8,6 @@ describe("formatDryRun", () => {
       prompt: "Test prompt",
       harnessArgs: ["-p"],
       harnessName: "claude",
-      contextFiles: [],
       templateVars: {},
     };
     const output = formatDryRun(info);
@@ -21,7 +20,6 @@ describe("formatDryRun", () => {
       prompt: "My test prompt content",
       harnessArgs: ["-p"],
       harnessName: "claude",
-      contextFiles: [],
       templateVars: {},
     };
     const output = formatDryRun(info);
@@ -35,7 +33,6 @@ describe("formatDryRun", () => {
       prompt: "Test",
       harnessArgs: [],
       harnessName: "claude",
-      contextFiles: [],
       templateVars: { target: "src/main.ts", branch: "develop" },
     };
     const output = formatDryRun(info);
@@ -46,30 +43,12 @@ describe("formatDryRun", () => {
     expect(output).toContain("develop");
   });
 
-  test("includes context files", () => {
-    const info: DryRunInfo = {
-      frontmatter: {},
-      prompt: "Test",
-      harnessArgs: [],
-      harnessName: "claude",
-      contextFiles: [
-        { path: "/full/path/utils.ts", relativePath: "utils.ts", content: "const x = 1;\nconst y = 2;" }
-      ],
-      templateVars: {},
-    };
-    const output = formatDryRun(info);
-    expect(output).toContain("CONTEXT FILES");
-    expect(output).toContain("utils.ts");
-    expect(output).toContain("2 lines");
-  });
-
   test("includes command", () => {
     const info: DryRunInfo = {
       frontmatter: { model: "opus" },
       prompt: "Test",
       harnessArgs: ["--model", "opus", "-p"],
       harnessName: "claude",
-      contextFiles: [],
       templateVars: {},
     };
     const output = formatDryRun(info);
@@ -85,7 +64,6 @@ describe("formatDryRun", () => {
       prompt: "Test",
       harnessArgs: [],
       harnessName: "claude",
-      contextFiles: [],
       templateVars: {},
     };
     const output = formatDryRun(info);
@@ -104,7 +82,6 @@ describe("formatDryRun", () => {
       prompt: "Test",
       harnessArgs: [],
       harnessName: "claude",
-      contextFiles: [],
       templateVars: {},
     };
     const output = formatDryRun(info);
@@ -120,7 +97,6 @@ describe("formatDryRun", () => {
       prompt: longPrompt,
       harnessArgs: [],
       harnessName: "claude",
-      contextFiles: [],
       templateVars: {},
     };
     const output = formatDryRun(info);
