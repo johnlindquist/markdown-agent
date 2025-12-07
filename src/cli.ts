@@ -1,3 +1,8 @@
+import { select } from "@inquirer/prompts";
+import { Glob } from "bun";
+import { basename } from "path";
+import { realpathSync } from "fs";
+
 export interface CliArgs {
   filePath: string;
   passthroughArgs: string[];
@@ -5,6 +10,19 @@ export interface CliArgs {
   help: boolean;
   setup: boolean;
   logs: boolean;
+}
+
+/** Result of handling ma commands - can include a selected file from interactive picker */
+export interface HandleMaCommandsResult {
+  handled: boolean;
+  selectedFile?: string;
+}
+
+/** Agent file discovered by the file finder */
+export interface AgentFile {
+  name: string;
+  path: string;
+  source: string;
 }
 
 /**
@@ -90,9 +108,90 @@ Without a file:
 }
 
 /**
- * Handle ma's own commands (when no file provided)
+ * Normalize a path to its real (resolved symlinks) absolute form
+ * Used to deduplicate files that may appear via different paths (e.g., /var vs /private/var on macOS)
  */
-export async function handleMaCommands(args: CliArgs): Promise<boolean> {
+function normalizePath(filePath: string): string {
+  try {
+    return realpathSync(filePath);
+  } catch {
+    // If realpath fails, fall back to the original path
+    return filePath;
+  }
+}
+
+/**
+ * Find agent markdown files from current directory and $PATH
+ * Returns files sorted by source (cwd first, then PATH directories)
+ */
+export async function findAgentFiles(): Promise<AgentFile[]> {
+  const files: AgentFile[] = [];
+  const seenPaths = new Set<string>();
+
+  const glob = new Glob("*.md");
+
+  // 1. Current directory
+  try {
+    for await (const file of glob.scan({ cwd: process.cwd(), absolute: true })) {
+      const normalizedPath = normalizePath(file);
+      if (!seenPaths.has(normalizedPath)) {
+        seenPaths.add(normalizedPath);
+        files.push({ name: basename(file), path: normalizedPath, source: "cwd" });
+      }
+    }
+  } catch {
+    // Skip if cwd is not accessible
+  }
+
+  // 2. $PATH directories
+  const pathDirs = (process.env.PATH || "").split(":");
+  for (const dir of pathDirs) {
+    if (!dir) continue;
+    try {
+      for await (const file of glob.scan({ cwd: dir, absolute: true })) {
+        const normalizedPath = normalizePath(file);
+        if (!seenPaths.has(normalizedPath)) {
+          seenPaths.add(normalizedPath);
+          files.push({ name: basename(file), path: normalizedPath, source: dir });
+        }
+      }
+    } catch {
+      // Skip directories that don't exist or can't be read
+    }
+  }
+
+  return files;
+}
+
+/**
+ * Show interactive file picker and return selected file path
+ */
+export async function showInteractiveSelector(files: AgentFile[]): Promise<string | undefined> {
+  if (files.length === 0) {
+    return undefined;
+  }
+
+  try {
+    const selected = await select({
+      message: "Select an agent to run:",
+      choices: files.map(f => ({
+        name: f.name,
+        value: f.path,
+        description: f.source === "cwd" ? "(current directory)" : f.source,
+      })),
+    });
+    return selected;
+  } catch {
+    // User cancelled (Ctrl+C) or other error
+    return undefined;
+  }
+}
+
+/**
+ * Handle ma's own commands (when no file provided)
+ * Returns result indicating if command was handled and optionally a selected file
+ */
+export async function handleMaCommands(args: CliArgs): Promise<HandleMaCommandsResult> {
   if (args.help) {
     printHelp();
     process.exit(0);
@@ -121,5 +220,20 @@ export async function handleMaCommands(args: CliArgs): Promise<boolean> {
     process.exit(0);
   }
 
-  return false;
+  // No file and no flags - show interactive picker if TTY
+  if (!args.filePath && !args.help && !args.setup && !args.logs) {
+    if (process.stdin.isTTY) {
+      const mdFiles = await findAgentFiles();
+      if (mdFiles.length > 0) {
+        const selected = await showInteractiveSelector(mdFiles);
+        if (selected) {
+          return { handled: true, selectedFile: selected };
+        }
+        // User cancelled - exit gracefully
+        process.exit(0);
+      }
+    }
+  }
+
+  return { handled: false };
 }

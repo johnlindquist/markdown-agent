@@ -30,14 +30,21 @@ async function main() {
   const cliArgs = parseCliArgs(process.argv);
 
   // Handle ma's own commands when no file provided
-  if (!cliArgs.filePath) {
-    await handleMaCommands(cliArgs);
-    console.error("Usage: ma <file.md> [flags for command]");
-    console.error("Run 'ma --help' for more info");
-    process.exit(1);
+  let filePath = cliArgs.filePath;
+  if (!filePath) {
+    const result = await handleMaCommands(cliArgs);
+    if (result.selectedFile) {
+      // User selected a file from the interactive picker
+      filePath = result.selectedFile;
+    } else if (!result.handled) {
+      // No file selected and no command handled - show usage
+      console.error("Usage: ma <file.md> [flags for command]");
+      console.error("Run 'ma --help' for more info");
+      process.exit(1);
+    }
   }
 
-  const { filePath, passthroughArgs } = cliArgs;
+  const { passthroughArgs } = cliArgs;
 
   // Handle remote URLs
   let localFilePath = filePath;
