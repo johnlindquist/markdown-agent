@@ -141,7 +141,8 @@ Hello`);
       const resolved = await runtime.resolve(filePath);
       const context = await runtime.buildContext(resolved);
 
-      expect(context.frontmatter).toEqual({});
+      // Built-in defaults for claude add print: true (print mode by default)
+      expect(context.frontmatter).toEqual({ print: true });
       expect(context.rawBody).toBe("Just body");
     });
   });
