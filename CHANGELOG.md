@@ -1,3 +1,15 @@
+# [2.14.0](https://github.com/johnlindquist/markdown-agent/compare/v2.13.1...v2.14.0) (2025-12-08)
+
+
+### Bug Fixes
+
+* update runtime test for print-mode defaults ([57f2027](https://github.com/johnlindquist/markdown-agent/commit/57f2027d1ed7ba9ca278e4c9ad25c29c3c23dc31))
+
+
+### Features
+
+* print mode by default with $interactive and .i. filename support ([660a8fb](https://github.com/johnlindquist/markdown-agent/commit/660a8fb22daf6adc53ee001a998314dd718fa490))
+
 ## [2.13.1](https://github.com/johnlindquist/markdown-agent/compare/v2.13.0...v2.13.1) (2025-12-08)
 
 
