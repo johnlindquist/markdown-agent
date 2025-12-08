@@ -166,27 +166,13 @@ Examples:
     targetDir = resolve(options.customDir);
   }
 
-  // 4. Content
+  // 4. Content - empty by default
   if (options.content === undefined) {
-    // Default template
-    options.content = `
-# ${options.name.replace(".md", "")}
-
-Describe your agent's task here.
-You can use variables like {{ prompt }} which map to CLI arguments.
-
-Example:
-Can you help me with {{ prompt }}?
-`.trim();
+    options.content = "";
   }
 
-  // Prepare frontmatter
+  // Prepare frontmatter - only include what user explicitly provided
   const finalFrontmatter = { ...options.frontmatter };
-
-  // If no args defined and using default template, add safe defaults
-  if (!finalFrontmatter.args && !Object.keys(options.frontmatter).length) {
-    finalFrontmatter.args = ["prompt"];
-  }
 
   // Construct YAML
   let fileContent = "";
