@@ -94,8 +94,8 @@ Commands are resolved in priority order:
 - `args`: Named positional arguments for template vars
 - `env` (object form): Sets process.env before execution
 - `$1`, `$2`, etc.: Map positional args to flags
-- `$interactive`: Enable interactive mode (overrides print-mode defaults)
-- `$exec`: Used internally for codex exec subcommand
+- `_interactive`: Enable interactive mode (overrides print-mode defaults)
+- `_subcommand`: Prepend subcommand(s) to CLI args (string or array)
 
 **All other keys** are passed directly as CLI flags:
 
@@ -123,7 +123,7 @@ $1: prompt    # Body passed as --prompt <body> instead of positional
 
 ### Print vs Interactive Mode
 
-All commands default to **print mode** (non-interactive). Use `.i.` filename marker or `$interactive: true` for interactive mode.
+All commands default to **print mode** (non-interactive). Use `.i.` filename marker or `_interactive: true` for interactive mode.
 
 ```bash
 task.claude.md      # Print mode: claude --print "..."

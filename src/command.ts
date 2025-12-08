@@ -126,6 +126,9 @@ export function buildArgs(
     // Skip named template variable fields ($varname) - consumed for template substitution
     if (key.startsWith("$")) continue;
 
+    // Skip internal ma keys (_interactive, _subcommand, etc.)
+    if (key.startsWith("_")) continue;
+
     // Skip template variables (used for substitution, not passed to command)
     if (templateVars.has(key)) continue;
 

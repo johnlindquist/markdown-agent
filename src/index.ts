@@ -241,7 +241,7 @@ async function main() {
     // Check for .i. interactive marker in filename
     const interactiveFromFilename = hasInteractiveMarker(localFilePath);
 
-    // Apply $interactive mode transformations (converts print defaults to interactive mode per command)
+    // Apply _interactive mode transformations (converts print defaults to interactive mode per command)
     frontmatter = applyInteractiveMode(frontmatter, command, interactiveFromFilename);
 
     // Extract and apply environment variables (object form) to process.env
@@ -385,9 +385,12 @@ async function main() {
       // Build final args with positional mappings applied (same as runCommand)
       let dryRunArgs = [...args];
 
-      // Handle codex $exec: prepend 'exec' to args
-      if (frontmatter.$exec && command === "codex") {
-        dryRunArgs = ["exec", ...dryRunArgs];
+      // Handle _subcommand: prepend subcommand(s) to args
+      if (frontmatter._subcommand) {
+        const subcommands = Array.isArray(frontmatter._subcommand)
+          ? frontmatter._subcommand
+          : [frontmatter._subcommand];
+        dryRunArgs = [...subcommands, ...dryRunArgs];
       }
 
       for (let i = 0; i < positionals.length; i++) {
@@ -455,11 +458,14 @@ async function main() {
       }
     }
 
-    // Handle codex $exec: prepend 'exec' to args (codex exec is the non-interactive subcommand)
+    // Handle _subcommand: prepend subcommand(s) to args
     let finalCommand = command;
     let finalRunArgs = args;
-    if (frontmatter.$exec && command === "codex") {
-      finalRunArgs = ["exec", ...args];
+    if (frontmatter._subcommand) {
+      const subcommands = Array.isArray(frontmatter._subcommand)
+        ? frontmatter._subcommand
+        : [frontmatter._subcommand];
+      finalRunArgs = [...subcommands, ...args];
     }
 
     getCommandLogger().info({ command: finalCommand, argsCount: finalRunArgs.length, promptLength: finalBody.length }, "Executing command");

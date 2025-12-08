@@ -37,14 +37,14 @@ export const BUILTIN_DEFAULTS: GlobalConfig = {
       print: true,        // --print flag for non-interactive mode
     },
     codex: {
-      $exec: true,        // Use 'exec' subcommand for non-interactive mode
+      _subcommand: "exec",  // Use 'exec' subcommand for non-interactive mode
     },
     // gemini defaults to one-shot mode (no special flags needed)
   },
 };
 
 /**
- * Apply $interactive mode transformations to frontmatter
+ * Apply _interactive mode transformations to frontmatter
  * Converts print defaults to interactive mode per command
  *
  * @param frontmatter - The frontmatter after defaults are applied
@@ -57,15 +57,15 @@ export function applyInteractiveMode(
   command: string,
   interactiveFromFilename: boolean = false
 ): AgentFrontmatter {
-  // Check if $interactive is enabled (truthy, empty string, or from filename)
-  const interactiveMode = frontmatter.$interactive ?? interactiveFromFilename;
+  // Check if _interactive is enabled (truthy, empty string, or from filename)
+  const interactiveMode = frontmatter._interactive ?? interactiveFromFilename;
   if (!interactiveMode && interactiveMode !== "") {
     return frontmatter;
   }
 
-  // Remove $interactive from output (it's a meta-key, not a CLI flag)
+  // Remove _interactive from output (it's a meta-key, not a CLI flag)
   const result = { ...frontmatter };
-  delete result.$interactive;
+  delete result._interactive;
 
   switch (command) {
     case "copilot":
@@ -79,8 +79,8 @@ export function applyInteractiveMode(
       break;
 
     case "codex":
-      // codex: Remove $exec marker (interactive is default without exec subcommand)
-      delete result.$exec;
+      // codex: Remove _subcommand (interactive is default without exec subcommand)
+      delete result._subcommand;
       break;
 
     case "gemini":
@@ -89,7 +89,7 @@ export function applyInteractiveMode(
       break;
 
     default:
-      // Unknown command - just remove $interactive, no other changes
+      // Unknown command - just remove _interactive, no other changes
       break;
   }
 

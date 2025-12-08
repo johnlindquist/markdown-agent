@@ -197,7 +197,7 @@ p: true                               # → -p (single char = short flag)
 
 ## Print vs Interactive Mode
 
-All commands run in **print mode by default** (non-interactive, exit after completion). Use the `.i.` filename marker or `$interactive: true` to enable interactive mode.
+All commands run in **print mode by default** (non-interactive, exit after completion). Use the `.i.` filename marker or `_interactive: true` to enable interactive mode.
 
 ### Print Mode (Default)
 
@@ -219,11 +219,11 @@ task.i.codex.md     # Runs: codex "..." (interactive session)
 task.i.gemini.md    # Runs: gemini --prompt-interactive "..."
 ```
 
-Or use `$interactive: true` in frontmatter:
+Or use `_interactive: true` in frontmatter:
 
 ```yaml
 ---
-$interactive: true
+_interactive: true
 model: opus
 ---
 Review this code with me interactively.

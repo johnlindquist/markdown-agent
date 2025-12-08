@@ -24,7 +24,7 @@ describe("config", () => {
     expect(config.commands?.copilot).toBeDefined();
     expect(config.commands?.copilot.$1).toBe("prompt");  // Print mode by default
     expect(config.commands?.claude?.print).toBe(true);   // Print mode by default
-    expect(config.commands?.codex?.$exec).toBe(true);    // Exec mode by default
+    expect(config.commands?.codex?._subcommand).toBe("exec");  // Exec subcommand by default
   });
 
   test("getCommandDefaults returns defaults for copilot", async () => {
