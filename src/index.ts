@@ -79,18 +79,45 @@ async function main() {
   try {
     const cliArgs = parseCliArgs(process.argv);
 
-    // Handle 'create' subcommand
-    // Intercept "create" as a keyword rather than a file path
-    if (cliArgs.filePath === "create") {
-      // Dynamic import to avoid loading inquirer prompts when not needed (startup speed)
+    // Handle subcommands (create, setup, logs, help)
+    // These are intercepted before treating the argument as a file path
+    const subcommand = cliArgs.filePath;
+
+    if (subcommand === "create") {
       const { runCreate } = await import("./create");
       await runCreate(cliArgs.passthroughArgs);
       process.exit(0);
     }
 
+    if (subcommand === "setup") {
+      const { runSetup } = await import("./setup");
+      await runSetup();
+      process.exit(0);
+    }
+
+    if (subcommand === "logs") {
+      const { getLogDir, listLogDirs } = await import("./logger");
+      const logDir = getLogDir();
+      console.log(`Log directory: ${logDir}\n`);
+      const dirs = listLogDirs();
+      if (dirs.length === 0) {
+        console.log("No agent logs yet. Run an agent to generate logs.");
+      } else {
+        console.log("Agent logs:");
+        for (const dir of dirs) {
+          console.log(`  ${dir}/`);
+        }
+      }
+      process.exit(0);
+    }
+
+    if (subcommand === "help") {
+      cliArgs.help = true;
+    }
+
     // Handle ma's own commands when no file provided
     let filePath = cliArgs.filePath;
-    if (!filePath) {
+    if (!filePath || subcommand === "help") {
       const result = await handleMaCommands(cliArgs);
       if (result.selectedFile) {
         // User selected a file from the interactive picker
@@ -98,8 +125,9 @@ async function main() {
       } else if (!result.handled) {
         // No file selected and no command handled - show usage
         console.error("Usage: ma <file.md> [flags for command]");
-        console.error("       ma create [options]");
-        console.error("Run 'ma --help' for more info");
+        console.error("       ma <command> [options]");
+        console.error("\nCommands: create, setup, logs, help");
+        console.error("Run 'ma help' for more info");
         throw new ConfigurationError("No agent file specified", 1);
       }
     }

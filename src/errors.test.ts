@@ -357,10 +357,8 @@ describe("CLI Error Integration", () => {
       await expect(handleMaCommands(args)).rejects.toThrow(EarlyExitRequest);
     });
 
-    it("is thrown for --logs flag", async () => {
-      const args = parseCliArgs(["node", "script", "--logs"]);
-      await expect(handleMaCommands(args)).rejects.toThrow(EarlyExitRequest);
-    });
+    // Note: --logs and --setup are now subcommands (ma logs, ma setup)
+    // handled in index.ts, not handleMaCommands
 
     it("has exit code 0 for --help", async () => {
       const args = parseCliArgs(["node", "script", "--help"]);

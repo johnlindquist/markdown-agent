@@ -113,12 +113,12 @@ describe("Output Stream Separation", () => {
 
       // Help text should be on stdout since user explicitly requested it
       expect(stdout).toContain("Usage: ma");
-      expect(stdout).toContain("--help");
+      expect(stdout).toContain("Commands:");
     });
 
-    test("--logs outputs directory info to stdout (requested data)", async () => {
+    test("'logs' subcommand outputs directory info to stdout", async () => {
       const proc = spawn({
-        cmd: ["bun", "run", `${PROJECT_ROOT}/src/index.ts`, "--logs"],
+        cmd: ["bun", "run", `${PROJECT_ROOT}/src/index.ts`, "logs"],
         cwd: PROJECT_ROOT,
         stdout: "pipe",
         stderr: "pipe",

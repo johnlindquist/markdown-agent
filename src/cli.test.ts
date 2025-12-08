@@ -28,24 +28,25 @@ describe("parseCliArgs", () => {
     expect(result.help).toBe(true);
   });
 
-  test("--setup works when no file provided", () => {
-    const result = parseCliArgs(["node", "script", "--setup"]);
-    expect(result.filePath).toBe("");
-    expect(result.setup).toBe(true);
+  test("subcommands are treated as filePath (handled by index.ts)", () => {
+    // setup, logs, create are subcommands - they appear as filePath
+    // and are intercepted by index.ts before being treated as files
+    const setupResult = parseCliArgs(["node", "script", "setup"]);
+    expect(setupResult.filePath).toBe("setup");
+
+    const logsResult = parseCliArgs(["node", "script", "logs"]);
+    expect(logsResult.filePath).toBe("logs");
+
+    const createResult = parseCliArgs(["node", "script", "create", "-g"]);
+    expect(createResult.filePath).toBe("create");
+    expect(createResult.passthroughArgs).toEqual(["-g"]);
   });
 
-  test("--logs works when no file provided", () => {
-    const result = parseCliArgs(["node", "script", "--logs"]);
-    expect(result.filePath).toBe("");
-    expect(result.logs).toBe(true);
-  });
-
-  test("ma flags ignored when file is provided", () => {
-    const result = parseCliArgs(["node", "script", "DEMO.md", "--help", "--setup"]);
+  test("ma flags pass through when file is provided", () => {
+    const result = parseCliArgs(["node", "script", "DEMO.md", "--help", "--model", "opus"]);
     expect(result.filePath).toBe("DEMO.md");
     expect(result.help).toBe(false);
-    expect(result.setup).toBe(false);
-    expect(result.passthroughArgs).toEqual(["--help", "--setup"]);
+    expect(result.passthroughArgs).toEqual(["--help", "--model", "opus"]);
   });
 });
 

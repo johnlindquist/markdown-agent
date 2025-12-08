@@ -8,10 +8,8 @@ import { EarlyExitRequest, UserCancelledError } from "./errors";
 export interface CliArgs {
   filePath: string;
   passthroughArgs: string[];
-  // These only apply when NO file is provided
+  // Only help flag remains - setup/logs are now subcommands
   help: boolean;
-  setup: boolean;
-  logs: boolean;
 }
 
 /** Result of handling ma commands - can include a selected file from interactive picker */
@@ -30,17 +28,17 @@ export interface AgentFile {
 /**
  * Parse CLI arguments
  *
- * When a markdown file is provided: ALL flags pass through to the command
- * When no file is provided: ma's own flags are processed (--help, --setup, --logs)
+ * When a markdown file or subcommand is provided: ALL flags pass through
+ * When no file is provided: ma's own flags are processed (--help)
  */
 export function parseCliArgs(argv: string[]): CliArgs {
   const args = argv.slice(2);
 
-  // First, find if there's a markdown file
+  // First, find if there's a file/subcommand (first non-flag argument)
   const fileIndex = args.findIndex(arg => !arg.startsWith("-"));
   const filePath = fileIndex >= 0 ? args[fileIndex] : "";
 
-  // If we have a file, everything else passes through
+  // If we have a file/subcommand, everything else passes through
   if (filePath) {
     const passthroughArgs = [
       ...args.slice(0, fileIndex),
@@ -50,47 +48,38 @@ export function parseCliArgs(argv: string[]): CliArgs {
       filePath,
       passthroughArgs,
       help: false,
-      setup: false,
-      logs: false,
     };
   }
 
-  // No file - check for ma's own commands
+  // No file - check for --help flag
   let help = false;
-  let setup = false;
-  let logs = false;
-
   for (const arg of args) {
     if (arg === "--help" || arg === "-h") help = true;
-    if (arg === "--setup") setup = true;
-    if (arg === "--logs") logs = true;
   }
 
   return {
     filePath: "",
-    passthroughArgs: [],
+    passthroughArgs: args,
     help,
-    setup,
-    logs,
   };
 }
 
 function printHelp() {
   console.log(`
-Usage: ma <file.md> [any flags for the command]
-       ma create [name] [flags]
-       ma <file.md> --command <cmd>
-       ma <file.md> --dry-run
-       ma <url> [--trust]
-       ma --setup
-       ma --logs
-       ma --help
+Usage: ma <file.md> [flags for the command]
+       ma <command> [options]
 
-Create Mode:
+Commands:
+  ma create [name] [flags]      Create a new agent file
+  ma setup                      Configure shell (PATH, aliases)
+  ma logs                       Show agent log directory
+  ma help                       Show this help
+
+Create options:
   ma create                     Interactive agent creator
-  ma create --name my-task      Create with name
+  ma create task.claude.md      Create with name (auto-detects command)
   ma create -n task -p          Create in project .ma/ folder
-  ma create -g --model gpt-4    Create in global ~/.ma/ folder with frontmatter
+  ma create -g --model gpt-4    Create globally with frontmatter
 
 Command resolution:
   1. --command flag (e.g., ma task.md --command claude)
@@ -131,11 +120,8 @@ ma-specific flags (consumed, not passed to command):
   --dry-run       Show resolved command and prompt without executing
   --trust         Skip trust prompt for remote URLs (TOFU bypass)
 
-Without a file:
-  ma             Interactive agent picker (from ./.ma/, ~/.ma/, etc.)
-  ma --setup     Configure shell to run .md files directly
-  ma --logs      Show log directory
-  ma --help      Show this help
+Without arguments:
+  ma              Interactive agent picker (from ./.ma/, ~/.ma/, etc.)
 `);
 }
 
@@ -281,31 +267,8 @@ export async function handleMaCommands(args: CliArgs): Promise<HandleMaCommandsR
     throw new EarlyExitRequest();
   }
 
-  if (args.logs) {
-    // Import dynamically to avoid circular deps
-    const { getLogDir, listLogDirs } = await import("./logger");
-    const logDir = getLogDir();
-    console.log(`Log directory: ${logDir}\n`);
-    const dirs = listLogDirs();
-    if (dirs.length === 0) {
-      console.log("No agent logs yet. Run an agent to generate logs.");
-    } else {
-      console.log("Agent logs:");
-      for (const dir of dirs) {
-        console.log(`  ${dir}/`);
-      }
-    }
-    throw new EarlyExitRequest();
-  }
-
-  if (args.setup) {
-    const { runSetup } = await import("./setup");
-    await runSetup();
-    throw new EarlyExitRequest();
-  }
-
   // No file and no flags - show interactive picker if TTY
-  if (!args.filePath && !args.help && !args.setup && !args.logs) {
+  if (!args.filePath && !args.help) {
     if (process.stdin.isTTY) {
       const mdFiles = await findAgentFiles();
       if (mdFiles.length > 0) {
