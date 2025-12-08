@@ -79,6 +79,15 @@ async function main() {
   try {
     const cliArgs = parseCliArgs(process.argv);
 
+    // Handle 'create' subcommand
+    // Intercept "create" as a keyword rather than a file path
+    if (cliArgs.filePath === "create") {
+      // Dynamic import to avoid loading inquirer prompts when not needed (startup speed)
+      const { runCreate } = await import("./create");
+      await runCreate(cliArgs.passthroughArgs);
+      process.exit(0);
+    }
+
     // Handle ma's own commands when no file provided
     let filePath = cliArgs.filePath;
     if (!filePath) {
@@ -89,6 +98,7 @@ async function main() {
       } else if (!result.handled) {
         // No file selected and no command handled - show usage
         console.error("Usage: ma <file.md> [flags for command]");
+        console.error("       ma create [options]");
         console.error("Run 'ma --help' for more info");
         throw new ConfigurationError("No agent file specified", 1);
       }

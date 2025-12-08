@@ -78,12 +78,19 @@ export function parseCliArgs(argv: string[]): CliArgs {
 function printHelp() {
   console.log(`
 Usage: ma <file.md> [any flags for the command]
+       ma create [name] [flags]
        ma <file.md> --command <cmd>
        ma <file.md> --dry-run
        ma <url> [--trust]
        ma --setup
        ma --logs
        ma --help
+
+Create Mode:
+  ma create                     Interactive agent creator
+  ma create --name my-task      Create with name
+  ma create -n task -p          Create in project .ma/ folder
+  ma create -g --model gpt-4    Create in global ~/.ma/ folder with frontmatter
 
 Command resolution:
   1. --command flag (e.g., ma task.md --command claude)
