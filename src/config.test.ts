@@ -3,6 +3,7 @@ import {
   loadGlobalConfig,
   getCommandDefaults,
   applyDefaults,
+  applyInteractiveMode,
   clearConfigCache,
   findGitRoot,
   loadProjectConfig,
@@ -308,5 +309,94 @@ describe("config cascade", () => {
 
     const config = await loadProjectConfig(gitRoot);
     expect(config.commands?.claude?.model).toBe("opus");
+  });
+});
+
+describe("applyInteractiveMode", () => {
+  test("removes print flag for claude with _interactive: true", () => {
+    const frontmatter = { print: true, model: "opus", _interactive: true };
+    const result = applyInteractiveMode(frontmatter, "claude");
+    expect(result.print).toBeUndefined();
+    expect(result._interactive).toBeUndefined();
+    expect(result.model).toBe("opus");
+  });
+
+  test("removes print flag for claude with _i: true", () => {
+    const frontmatter = { print: true, model: "opus", _i: true };
+    const result = applyInteractiveMode(frontmatter, "claude");
+    expect(result.print).toBeUndefined();
+    expect(result._i).toBeUndefined();
+    expect(result.model).toBe("opus");
+  });
+
+  test("handles _interactive with null value (YAML empty key)", () => {
+    const frontmatter = { print: true, _interactive: null };
+    const result = applyInteractiveMode(frontmatter, "claude");
+    expect(result.print).toBeUndefined();
+    expect(result._interactive).toBeUndefined();
+  });
+
+  test("handles _i with null value (YAML empty key)", () => {
+    const frontmatter = { print: true, _i: null };
+    const result = applyInteractiveMode(frontmatter, "claude");
+    expect(result.print).toBeUndefined();
+    expect(result._i).toBeUndefined();
+  });
+
+  test("handles _interactive with empty string value", () => {
+    const frontmatter = { print: true, _interactive: "" };
+    const result = applyInteractiveMode(frontmatter, "claude");
+    expect(result.print).toBeUndefined();
+  });
+
+  test("handles _i with empty string value", () => {
+    const frontmatter = { print: true, _i: "" };
+    const result = applyInteractiveMode(frontmatter, "claude");
+    expect(result.print).toBeUndefined();
+  });
+
+  test("does not trigger interactive mode with _interactive: false", () => {
+    const frontmatter = { print: true, _interactive: false };
+    const result = applyInteractiveMode(frontmatter, "claude");
+    expect(result.print).toBe(true);
+  });
+
+  test("does not trigger interactive mode when _interactive not present", () => {
+    const frontmatter = { print: true, model: "opus" };
+    const result = applyInteractiveMode(frontmatter, "claude");
+    expect(result.print).toBe(true);
+  });
+
+  test("triggers interactive mode via external flag (interactiveFromExternal)", () => {
+    const frontmatter = { print: true, model: "opus" };
+    const result = applyInteractiveMode(frontmatter, "claude", true);
+    expect(result.print).toBeUndefined();
+    expect(result.model).toBe("opus");
+  });
+
+  test("changes copilot $1 from prompt to interactive", () => {
+    const frontmatter = { $1: "prompt", silent: true, _interactive: true };
+    const result = applyInteractiveMode(frontmatter, "copilot");
+    expect(result.$1).toBe("interactive");
+    expect(result.silent).toBe(true);
+  });
+
+  test("removes _subcommand for codex", () => {
+    const frontmatter = { _subcommand: "exec", _interactive: true };
+    const result = applyInteractiveMode(frontmatter, "codex");
+    expect(result._subcommand).toBeUndefined();
+  });
+
+  test("adds prompt-interactive for gemini", () => {
+    const frontmatter = { model: "pro", _interactive: true };
+    const result = applyInteractiveMode(frontmatter, "gemini");
+    expect(result.$1).toBe("prompt-interactive");
+  });
+
+  test("unknown command just removes _interactive", () => {
+    const frontmatter = { custom: "value", _interactive: true };
+    const result = applyInteractiveMode(frontmatter, "my-custom-cli");
+    expect(result._interactive).toBeUndefined();
+    expect(result.custom).toBe("value");
   });
 });

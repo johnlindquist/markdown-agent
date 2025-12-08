@@ -218,6 +218,14 @@ async function main() {
       remainingArgs.splice(trustIndex, 1); // Consume it
     }
 
+    // Check for --_interactive or -_i flag (consumed by ma, enables interactive mode)
+    let interactiveFromCli = false;
+    const interactiveIndex = remainingArgs.findIndex(arg => arg === "--_interactive" || arg === "-_i");
+    if (interactiveIndex !== -1) {
+      interactiveFromCli = true;
+      remainingArgs.splice(interactiveIndex, 1); // Consume it
+    }
+
     // Resolve command: CLI --command > MA_COMMAND env > filename
     let command: string;
     try {
@@ -242,7 +250,8 @@ async function main() {
     const interactiveFromFilename = hasInteractiveMarker(localFilePath);
 
     // Apply _interactive mode transformations (converts print defaults to interactive mode per command)
-    frontmatter = applyInteractiveMode(frontmatter, command, interactiveFromFilename);
+    // Interactive can be triggered by: CLI flag (--_interactive/-_i), filename (.i.), or frontmatter (_interactive/_i)
+    frontmatter = applyInteractiveMode(frontmatter, command, interactiveFromFilename || interactiveFromCli);
 
     // Extract and apply environment variables (object form) to process.env
     // This must happen BEFORE import expansion so !`command` inlines can use them

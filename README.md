@@ -173,7 +173,7 @@ The `--feature_name` and `--target_dir` flags are consumed by markdown-agent for
 | `env` | object | Set process environment variables |
 | `env` | string[] | Pass as `--env` flags to command |
 | `$1`, `$2`... | string | Map positional args to flags (e.g., `$1: prompt`) |
-| `_interactive` | boolean | Enable interactive mode (overrides print-mode defaults) |
+| `_interactive` / `_i` | boolean | Enable interactive mode (overrides print-mode defaults) |
 | `_subcommand` | string/string[] | Prepend subcommand(s) to CLI args |
 
 ### All Other Keys → CLI Flags
@@ -199,7 +199,7 @@ p: true                               # → -p (single char = short flag)
 
 ## Print vs Interactive Mode
 
-All commands run in **print mode by default** (non-interactive, exit after completion). Use the `.i.` filename marker or `_interactive: true` to enable interactive mode.
+All commands run in **print mode by default** (non-interactive, exit after completion). Use the `.i.` filename marker, `_interactive` frontmatter, or CLI flags to enable interactive mode.
 
 ### Print Mode (Default)
 
@@ -221,14 +221,21 @@ task.i.codex.md     # Runs: codex "..." (interactive session)
 task.i.gemini.md    # Runs: gemini --prompt-interactive "..."
 ```
 
-Or use `_interactive: true` in frontmatter:
+Or use `_interactive` (or `_i`) in frontmatter:
 
 ```yaml
 ---
-_interactive: true
+_interactive: true   # or _interactive: (empty), or _i:
 model: opus
 ---
 Review this code with me interactively.
+```
+
+Or use CLI flags:
+
+```bash
+ma task.claude.md --_interactive  # Enable interactive mode
+ma task.claude.md -_i             # Short form
 ```
 
 ---
@@ -478,12 +485,18 @@ Command resolution:
 All frontmatter keys are passed as CLI flags to the command.
 Global defaults can be set in ~/.markdown-agent/config.yaml
 
+ma-specific flags (consumed, not passed to command):
+  --command, -c       Specify command to run
+  --dry-run           Preview without executing
+  --_interactive, -_i Enable interactive mode
+
 Examples:
   ma task.claude.md -p "print mode"
   ma task.claude.md --model opus --verbose
   ma commit.gemini.md
   ma task.md --command claude
   ma task.md -c gemini
+  ma task.claude.md -_i  # Run in interactive mode
 
 Without a file:
   ma --setup    Configure shell to run .md files directly

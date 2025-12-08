@@ -55,17 +55,29 @@ export const BUILTIN_DEFAULTS: GlobalConfig = {
 export function applyInteractiveMode(
   frontmatter: AgentFrontmatter,
   command: string,
-  interactiveFromFilename: boolean = false
+  interactiveFromExternal: boolean = false
 ): AgentFrontmatter {
-  // Check if _interactive is enabled (truthy, empty string, or from filename)
-  const interactiveMode = frontmatter._interactive ?? interactiveFromFilename;
-  if (!interactiveMode && interactiveMode !== "") {
+  // Check if _interactive or _i is enabled
+  // Can be: true, empty string (YAML key with no value), null (YAML key with explicit null), or external trigger
+  // NOTE: We check key existence separately because ?? treats null as "nullish" and skips to next value
+  const hasInteractiveKey = "_interactive" in frontmatter;
+  const hasIKey = "_i" in frontmatter;
+  const interactiveValue = hasInteractiveKey ? frontmatter._interactive : frontmatter._i;
+  const interactiveMode = interactiveFromExternal ||
+    interactiveValue === true ||
+    interactiveValue === "" ||
+    (hasInteractiveKey && interactiveValue === null) ||
+    (hasIKey && interactiveValue === null) ||
+    (interactiveValue !== undefined && interactiveValue !== false);
+
+  if (!interactiveMode) {
     return frontmatter;
   }
 
-  // Remove _interactive from output (it's a meta-key, not a CLI flag)
+  // Remove _interactive and _i from output (they're meta-keys, not CLI flags)
   const result = { ...frontmatter };
   delete result._interactive;
+  delete result._i;
 
   switch (command) {
     case "copilot":
