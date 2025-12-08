@@ -1,3 +1,10 @@
+# [2.15.0](https://github.com/johnlindquist/markdown-agent/compare/v2.14.1...v2.15.0) (2025-12-08)
+
+
+### Features
+
+* add _i alias and CLI flags for interactive mode ([679047f](https://github.com/johnlindquist/markdown-agent/commit/679047fe7d7204fc5e5ad2e352a1044ccb88a8f0))
+
 ## [2.14.1](https://github.com/johnlindquist/markdown-agent/compare/v2.14.0...v2.14.1) (2025-12-08)
 
 
