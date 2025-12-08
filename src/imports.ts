@@ -7,6 +7,11 @@ import { resilientFetch } from "./fetch";
 import { MAX_INPUT_SIZE, FileSizeLimitError, exceedsLimit } from "./limits";
 import { countTokens, getContextLimit } from "./tokenizer";
 
+// Re-export pipeline components for direct access
+export { parseImports, hasImportsInContent, isGlobPattern, parseLineRange, parseSymbolExtraction } from "./imports-parser";
+export { injectImports, createResolvedImport } from "./imports-injector";
+export type { ImportAction, ResolvedImport, SystemEnvironment } from "./imports-types";
+
 /**
  * Expand markdown imports, URL imports, and command inlines
  *
@@ -20,6 +25,16 @@ import { countTokens, getContextLimit } from "./tokenizer";
  *
  * Imports are processed recursively, with circular import detection.
  * URL imports validate content type - only markdown and json are allowed.
+ *
+ * ## Pipeline Architecture
+ *
+ * The import system is split into three phases:
+ * 1. **Parser** (pure): `parseImports()` - scans content, returns ImportActions
+ * 2. **Resolver** (impure): resolves actions via I/O (files, URLs, commands)
+ * 3. **Injector** (pure): `injectImports()` - stitches resolved content back
+ *
+ * This separation enables thorough unit testing of regex parsing and injection
+ * without filesystem dependencies.
  */
 
 /** Track files being processed to detect circular imports */
@@ -69,8 +84,8 @@ export function isBinaryFile(filePath: string, content?: Buffer): boolean {
   }
 
   // Check for files without extensions that are typically binary
-  const basename = filePath.split(/[/\\]/).pop() || "";
-  if (basename === ".DS_Store") {
+  const base = filePath.split(/[/\\]/).pop() || "";
+  if (base === ".DS_Store") {
     return true;
   }
 
@@ -165,14 +180,14 @@ export function toCanonicalPath(filePath: string): string {
 /**
  * Check if a path contains glob characters
  */
-function isGlobPattern(path: string): boolean {
+function isGlobPatternInternal(path: string): boolean {
   return path.includes("*") || path.includes("?") || path.includes("[");
 }
 
 /**
  * Parse import path for line range syntax: @./file.ts:10-50
  */
-function parseLineRange(path: string): { path: string; start?: number; end?: number } {
+function parseLineRangeInternal(path: string): { path: string; start?: number; end?: number } {
   const match = path.match(/^(.+):(\d+)-(\d+)$/);
   if (match) {
     return {
@@ -187,7 +202,7 @@ function parseLineRange(path: string): { path: string; start?: number; end?: num
 /**
  * Parse import path for symbol extraction: @./file.ts#SymbolName
  */
-function parseSymbolExtraction(path: string): { path: string; symbol?: string } {
+function parseSymbolExtractionInternal(path: string): { path: string; symbol?: string } {
   const match = path.match(/^(.+)#([a-zA-Z_$][a-zA-Z0-9_$]*)$/);
   if (match) {
     return {
@@ -592,12 +607,12 @@ async function processFileImport(
   resolvedImports?: ResolvedImportsTracker
 ): Promise<string> {
   // Check for glob pattern first
-  if (isGlobPattern(importPath)) {
+  if (isGlobPatternInternal(importPath)) {
     return processGlobImport(importPath, currentFileDir, verbose);
   }
 
   // Check for symbol extraction syntax
-  const symbolParsed = parseSymbolExtraction(importPath);
+  const symbolParsed = parseSymbolExtractionInternal(importPath);
   if (symbolParsed.symbol) {
     const resolvedPath = resolveImportPath(symbolParsed.path, currentFileDir);
 
@@ -629,7 +644,7 @@ async function processFileImport(
   }
 
   // Check for line range syntax
-  const rangeParsed = parseLineRange(importPath);
+  const rangeParsed = parseLineRangeInternal(importPath);
   if (rangeParsed.start !== undefined && rangeParsed.end !== undefined) {
     const resolvedPath = resolveImportPath(rangeParsed.path, currentFileDir);
 
@@ -741,6 +756,11 @@ async function processCommandInline(
 
 /**
  * Expand all imports, URL imports, and command inlines in content
+ *
+ * This is the main entry point that orchestrates the three-phase pipeline:
+ * 1. Parse: Find all imports in the content
+ * 2. Resolve: Fetch content for each import (files, URLs, commands)
+ * 3. Inject: Replace import markers with resolved content
  *
  * @param content - The markdown content to process
  * @param currentFileDir - Directory of the current file (for relative imports)
