@@ -25,15 +25,76 @@ const PROJECT_CONFIG_NAMES = ["ma.config.yaml", ".markdown-agent.yaml", ".markdo
 
 /**
  * Built-in defaults (used when no config file exists)
+ * All tools default to PRINT mode (non-interactive)
  */
 export const BUILTIN_DEFAULTS: GlobalConfig = {
   commands: {
     copilot: {
-      $1: "interactive",  // Map body to --interactive for copilot
+      $1: "prompt",       // Map body to --prompt for copilot (print mode)
       silent: true,       // Output only the agent response (no stats)
     },
+    claude: {
+      print: true,        // --print flag for non-interactive mode
+    },
+    codex: {
+      $exec: true,        // Use 'exec' subcommand for non-interactive mode
+    },
+    // gemini defaults to one-shot mode (no special flags needed)
   },
 };
+
+/**
+ * Apply $interactive mode transformations to frontmatter
+ * Converts print defaults to interactive mode per command
+ *
+ * @param frontmatter - The frontmatter after defaults are applied
+ * @param command - The resolved command name
+ * @param interactiveFromFilename - Whether .i. was detected in filename
+ * @returns Transformed frontmatter for interactive mode
+ */
+export function applyInteractiveMode(
+  frontmatter: AgentFrontmatter,
+  command: string,
+  interactiveFromFilename: boolean = false
+): AgentFrontmatter {
+  // Check if $interactive is enabled (truthy, empty string, or from filename)
+  const interactiveMode = frontmatter.$interactive ?? interactiveFromFilename;
+  if (!interactiveMode && interactiveMode !== "") {
+    return frontmatter;
+  }
+
+  // Remove $interactive from output (it's a meta-key, not a CLI flag)
+  const result = { ...frontmatter };
+  delete result.$interactive;
+
+  switch (command) {
+    case "copilot":
+      // copilot: Change from --prompt to --interactive
+      result.$1 = "interactive";
+      break;
+
+    case "claude":
+      // claude: Remove --print flag (interactive is default without it)
+      delete result.print;
+      break;
+
+    case "codex":
+      // codex: Remove $exec marker (interactive is default without exec subcommand)
+      delete result.$exec;
+      break;
+
+    case "gemini":
+      // gemini: Add --prompt-interactive flag
+      result.$1 = "prompt-interactive";
+      break;
+
+    default:
+      // Unknown command - just remove $interactive, no other changes
+      break;
+  }
+
+  return result;
+}
 
 let cachedGlobalConfig: GlobalConfig | null = null;
 let cachedProjectConfig: { cwd: string; config: GlobalConfig } | null = null;

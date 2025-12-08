@@ -41,7 +41,7 @@ Name your file `task.COMMAND.md` and the command is inferred:
 task.claude.md    # Runs claude
 task.gemini.md    # Runs gemini
 task.codex.md     # Runs codex
-task.copilot.md   # Runs copilot (body auto-mapped to --prompt)
+task.copilot.md   # Runs copilot (print mode by default)
 ```
 
 ### 2. Frontmatter → CLI Flags
@@ -195,19 +195,55 @@ p: true                               # → -p (single char = short flag)
 
 ---
 
+## Print vs Interactive Mode
+
+All commands run in **print mode by default** (non-interactive, exit after completion). Use the `.i.` filename marker or `$interactive: true` to enable interactive mode.
+
+### Print Mode (Default)
+
+```bash
+task.claude.md      # Runs: claude --print "..."
+task.copilot.md     # Runs: copilot --silent --prompt "..."
+task.codex.md       # Runs: codex exec "..."
+task.gemini.md      # Runs: gemini "..." (one-shot)
+```
+
+### Interactive Mode
+
+Add `.i.` before the command name in the filename:
+
+```bash
+task.i.claude.md    # Runs: claude "..." (interactive session)
+task.i.copilot.md   # Runs: copilot --silent --interactive "..."
+task.i.codex.md     # Runs: codex "..." (interactive session)
+task.i.gemini.md    # Runs: gemini --prompt-interactive "..."
+```
+
+Or use `$interactive: true` in frontmatter:
+
+```yaml
+---
+$interactive: true
+model: opus
+---
+Review this code with me interactively.
+```
+
+---
+
 ## Global Configuration
 
 Set default frontmatter per command in `~/.markdown-agent/config.yaml`:
 
 ```yaml
 commands:
-  copilot:
-    $1: prompt    # Always map body to --prompt for copilot
   claude:
     model: sonnet # Default model for claude
+  copilot:
+    silent: true  # Always use --silent for copilot
 ```
 
-**Built-in defaults:** Copilot automatically maps `$1: prompt` so you can use it without any frontmatter.
+**Built-in defaults:** All commands default to print mode with appropriate flags per CLI tool.
 
 ---
 
@@ -255,7 +291,16 @@ Analyze this codebase and suggest improvements.
 Explain this code.
 ```
 
-Thanks to the global config, this runs: `copilot --prompt "Explain this code."`
+This runs: `copilot --silent --prompt "Explain this code."` (print mode)
+
+For interactive mode, use `.i.` in the filename:
+
+```markdown
+# task.i.copilot.md
+Explain this code.
+```
+
+This runs: `copilot --silent --interactive "Explain this code."`
 
 ### Template Variables with Args
 

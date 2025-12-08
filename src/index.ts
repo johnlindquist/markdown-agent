@@ -3,10 +3,10 @@ import { parseFrontmatter } from "./parse";
 import { parseCliArgs, handleMaCommands } from "./cli";
 import { substituteTemplateVars, extractTemplateVars } from "./template";
 import { isRemoteUrl, fetchRemote, cleanupRemote } from "./remote";
-import { resolveCommand, buildArgs, runCommand, extractPositionalMappings, extractEnvVars, killCurrentChildProcess } from "./command";
+import { resolveCommand, buildArgs, runCommand, extractPositionalMappings, extractEnvVars, killCurrentChildProcess, hasInteractiveMarker } from "./command";
 import { expandImports, hasImports } from "./imports";
 import { loadEnvFiles } from "./env";
-import { loadGlobalConfig, getCommandDefaults, applyDefaults } from "./config";
+import { loadGlobalConfig, getCommandDefaults, applyDefaults, applyInteractiveMode } from "./config";
 import { initLogger, getParseLogger, getTemplateLogger, getCommandLogger, getImportLogger, getCurrentLogPath } from "./logger";
 import { isDomainTrusted, promptForTrust, addTrustedDomain, extractDomain } from "./trust";
 import { dirname, resolve } from "path";
@@ -236,7 +236,13 @@ async function main() {
     // Load global config and apply command defaults
     await loadGlobalConfig();
     const commandDefaults = await getCommandDefaults(command);
-    const frontmatter = applyDefaults(baseFrontmatter, commandDefaults);
+    let frontmatter = applyDefaults(baseFrontmatter, commandDefaults);
+
+    // Check for .i. interactive marker in filename
+    const interactiveFromFilename = hasInteractiveMarker(localFilePath);
+
+    // Apply $interactive mode transformations (converts print defaults to interactive mode per command)
+    frontmatter = applyInteractiveMode(frontmatter, command, interactiveFromFilename);
 
     // Extract and apply environment variables (object form) to process.env
     // This must happen BEFORE import expansion so !`command` inlines can use them
@@ -377,21 +383,27 @@ async function main() {
       console.log("═══════════════════════════════════════════════════════════\n");
 
       // Build final args with positional mappings applied (same as runCommand)
-      const finalArgs = [...args];
+      let dryRunArgs = [...args];
+
+      // Handle codex $exec: prepend 'exec' to args
+      if (frontmatter.$exec && command === "codex") {
+        dryRunArgs = ["exec", ...dryRunArgs];
+      }
+
       for (let i = 0; i < positionals.length; i++) {
         const pos = i + 1;
         const value = positionals[i];
         if (positionalMappings.has(pos)) {
           const flagName = positionalMappings.get(pos)!;
           const flag = flagName.length === 1 ? `-${flagName}` : `--${flagName}`;
-          finalArgs.push(flag, `"${value.replace(/"/g, '\\"')}"`);
+          dryRunArgs.push(flag, `"${value.replace(/"/g, '\\"')}"`);
         } else {
-          finalArgs.push(`"${value.replace(/"/g, '\\"')}"`);
+          dryRunArgs.push(`"${value.replace(/"/g, '\\"')}"`);
         }
       }
 
       console.log("Command:");
-      console.log(`   ${command} ${finalArgs.join(" ")}\n`);
+      console.log(`   ${command} ${dryRunArgs.join(" ")}\n`);
 
       console.log("Final Prompt:");
       console.log("───────────────────────────────────────────────────────────");
@@ -443,11 +455,18 @@ async function main() {
       }
     }
 
-    getCommandLogger().info({ command, argsCount: args.length, promptLength: finalBody.length }, "Executing command");
+    // Handle codex $exec: prepend 'exec' to args (codex exec is the non-interactive subcommand)
+    let finalCommand = command;
+    let finalRunArgs = args;
+    if (frontmatter.$exec && command === "codex") {
+      finalRunArgs = ["exec", ...args];
+    }
+
+    getCommandLogger().info({ command: finalCommand, argsCount: finalRunArgs.length, promptLength: finalBody.length }, "Executing command");
 
     const runResult = await runCommand({
-      command,
-      args,
+      command: finalCommand,
+      args: finalRunArgs,
       positionals,
       positionalMappings,
       captureOutput: false,

@@ -41,14 +41,15 @@ bun run ma task.claude.md
 ```
 .md file → parseFrontmatter() → resolveCommand(filename/env)
         → loadGlobalConfig() → applyDefaults()
-        → expandImports() → substituteTemplateVars()
-        → buildArgs() → runCommand()
+        → applyInteractiveMode() → expandImports()
+        → substituteTemplateVars() → buildArgs() → runCommand()
 ```
 
 ### Key Modules
 
 - **`command.ts`** - Command resolution and execution
   - `parseCommandFromFilename()`: Infers command from `task.claude.md` → `claude`
+  - `hasInteractiveMarker()`: Detects `.i.` in filename (e.g., `task.i.claude.md`)
   - `resolveCommand()`: Priority: MA_COMMAND env var > filename
   - `buildArgs()`: Converts frontmatter to CLI flags
   - `extractPositionalMappings()`: Extracts $1, $2, etc. mappings
@@ -56,9 +57,10 @@ bun run ma task.claude.md
 
 - **`config.ts`** - Global configuration
   - Loads defaults from `~/.markdown-agent/config.yaml`
-  - Built-in defaults: copilot maps $1 → prompt
+  - Built-in defaults: All commands default to print mode
   - `getCommandDefaults()`: Get defaults for a command
   - `applyDefaults()`: Merge defaults with frontmatter
+  - `applyInteractiveMode()`: Converts print defaults to interactive mode per command
 
 - **`types.ts`** - Core TypeScript interfaces
   - `AgentFrontmatter`: Simple interface with system keys + passthrough
@@ -92,6 +94,8 @@ Commands are resolved in priority order:
 - `args`: Named positional arguments for template vars
 - `env` (object form): Sets process.env before execution
 - `$1`, `$2`, etc.: Map positional args to flags
+- `$interactive`: Enable interactive mode (overrides print-mode defaults)
+- `$exec`: Used internally for codex exec subcommand
 
 **All other keys** are passed directly as CLI flags:
 
@@ -117,14 +121,27 @@ $1: prompt    # Body passed as --prompt <body> instead of positional
 ---
 ```
 
+### Print vs Interactive Mode
+
+All commands default to **print mode** (non-interactive). Use `.i.` filename marker or `$interactive: true` for interactive mode.
+
+```bash
+task.claude.md      # Print mode: claude --print "..."
+task.i.claude.md    # Interactive: claude "..."
+task.copilot.md     # Print mode: copilot --silent --prompt "..."
+task.i.copilot.md   # Interactive: copilot --silent --interactive "..."
+task.codex.md       # Print mode: codex exec "..."
+task.i.codex.md     # Interactive: codex "..."
+task.gemini.md      # Print mode: gemini "..." (one-shot)
+task.i.gemini.md    # Interactive: gemini --prompt-interactive "..."
+```
+
 ### Global Config (`~/.markdown-agent/config.yaml`)
 
 Set default frontmatter per command:
 
 ```yaml
 commands:
-  copilot:
-    $1: prompt    # Always map body to --prompt for copilot
   claude:
     model: sonnet # Default model for claude
 ```

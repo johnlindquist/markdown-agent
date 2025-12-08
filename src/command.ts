@@ -59,12 +59,24 @@ function isPositionalKey(key: string): boolean {
  * Extract command from filename
  * e.g., "commit.claude.md" → "claude"
  * e.g., "task.gemini.md" → "gemini"
+ * e.g., "fix.i.claude.md" → "claude" (with interactive mode)
  */
 export function parseCommandFromFilename(filePath: string): string | undefined {
   const name = basename(filePath);
-  // Match pattern: name.command.md
+  // Match pattern: name.command.md or name.i.command.md
   const match = name.match(/\.([^.]+)\.md$/i);
   return match?.[1];
+}
+
+/**
+ * Check if filename has .i. marker for interactive mode
+ * e.g., "fix.i.claude.md" → true
+ * e.g., "fix.claude.md" → false
+ */
+export function hasInteractiveMarker(filePath: string): boolean {
+  const name = basename(filePath);
+  // Match pattern: name.i.command.md
+  return /\.i\.[^.]+\.md$/i.test(name);
 }
 
 /**

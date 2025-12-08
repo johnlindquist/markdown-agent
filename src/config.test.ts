@@ -22,13 +22,15 @@ describe("config", () => {
     const config = await loadGlobalConfig();
     expect(config.commands).toBeDefined();
     expect(config.commands?.copilot).toBeDefined();
-    expect(config.commands?.copilot.$1).toBe("interactive");
+    expect(config.commands?.copilot.$1).toBe("prompt");  // Print mode by default
+    expect(config.commands?.claude?.print).toBe(true);   // Print mode by default
+    expect(config.commands?.codex?.$exec).toBe(true);    // Exec mode by default
   });
 
   test("getCommandDefaults returns defaults for copilot", async () => {
     const defaults = await getCommandDefaults("copilot");
     expect(defaults).toBeDefined();
-    expect(defaults?.$1).toBe("interactive");
+    expect(defaults?.$1).toBe("prompt");  // Print mode by default
   });
 
   test("getCommandDefaults returns undefined for unknown command", async () => {
@@ -184,7 +186,7 @@ describe("loadFullConfig", () => {
 
   test("includes built-in defaults when no project config", async () => {
     const config = await loadFullConfig(testDir);
-    expect(config.commands?.copilot?.$1).toBe("interactive");
+    expect(config.commands?.copilot?.$1).toBe("prompt");  // Print mode by default
   });
 
   test("project config overrides global config", async () => {
@@ -212,7 +214,7 @@ describe("loadFullConfig", () => {
 
     const config = await loadFullConfig(testDir);
     // Built-in defaults preserved
-    expect(config.commands?.copilot?.$1).toBe("interactive");
+    expect(config.commands?.copilot?.$1).toBe("prompt");  // Print mode by default
     // New command added
     expect(config.commands?.["my-tool"]?.$1).toBe("body");
     expect(config.commands?.["my-tool"]?.verbose).toBe(true);
@@ -229,7 +231,7 @@ describe("loadFullConfig", () => {
 
     const config = await loadFullConfig(testDir);
     // Built-in default preserved
-    expect(config.commands?.copilot?.$1).toBe("interactive");
+    expect(config.commands?.copilot?.$1).toBe("prompt");  // Print mode by default
     // New setting added
     expect(config.commands?.copilot?.verbose).toBe(true);
   });
