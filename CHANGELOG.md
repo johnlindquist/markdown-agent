@@ -1,3 +1,13 @@
+# [2.9.0](https://github.com/johnlindquist/markdown-agent/compare/v2.8.0...v2.9.0) (2025-12-08)
+
+
+### Features
+
+* add structured ExecutionPlan for dry-run mode ([8dea17c](https://github.com/johnlindquist/markdown-agent/commit/8dea17ccc6e66e24c0ffb0a46c06c62c6d3f6256))
+* add SystemEnvironment adapter pattern for dependency injection ([921b7ca](https://github.com/johnlindquist/markdown-agent/commit/921b7ca56543161be79399109a6a7dac7f5d5b85))
+* add typed error classes to eliminate process.exit() in library code ([0916afb](https://github.com/johnlindquist/markdown-agent/commit/0916afb6571860758b8f00a950f194ded36461b7))
+* merge testability architectural improvements from parallel branches ([5305dc0](https://github.com/johnlindquist/markdown-agent/commit/5305dc007341a82d0f0819cfb1a06dc79ef36090))
+
 # [2.8.0](https://github.com/johnlindquist/markdown-agent/compare/v2.7.0...v2.8.0) (2025-12-08)
 
 
