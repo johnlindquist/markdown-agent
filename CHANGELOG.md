@@ -1,3 +1,10 @@
+## [2.16.2](https://github.com/johnlindquist/mdflow/compare/v2.16.1...v2.16.2) (2025-12-09)
+
+
+### Bug Fixes
+
+* update remaining markdown-agent references to mdflow ([604d214](https://github.com/johnlindquist/mdflow/commit/604d2140264e8bc90fb4e031be1d302f0480c451))
+
 ## [2.16.1](https://github.com/johnlindquist/mdflow/compare/v2.16.0...v2.16.1) (2025-12-09)
 
 
