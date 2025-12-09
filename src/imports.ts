@@ -741,14 +741,14 @@ async function processFileImport(
 }
 
 /**
- * Pattern to detect markdown file paths that should be auto-run with `ma`
+ * Pattern to detect markdown file paths that should be auto-run with `md`
  * Matches: foo.md, ./foo.md, ~/foo.md, /path/to/foo.md, foo.claude.md, etc.
  * The command must start with a path-like pattern and end with .md
  */
 const MD_FILE_COMMAND_PATTERN = /^(~?\.?\.?\/)?[^\s]+\.md(\s|$)/;
 
 /**
- * Check if a command looks like a markdown file that should be run with `ma`
+ * Check if a command looks like a markdown file that should be run with `md`
  */
 export function isMarkdownFileCommand(command: string): boolean {
   return MD_FILE_COMMAND_PATTERN.test(command.trim());
@@ -763,11 +763,11 @@ async function processCommandInline(
   verbose: boolean,
   importCtx?: ImportContext
 ): Promise<string> {
-  // Auto-prefix markdown files with `ma` to run them as agents
+  // Auto-prefix markdown files with `md` to run them as agents
   let actualCommand = command;
   if (isMarkdownFileCommand(command)) {
-    actualCommand = `ma ${command}`;
-    console.error(`[imports] Auto-running .md file with ma: ${actualCommand}`);
+    actualCommand = `md ${command}`;
+    console.error(`[imports] Auto-running .md file with md: ${actualCommand}`);
   } else {
     // Always log command execution to stderr for visibility
     console.error(`[imports] Executing: ${command}`);
@@ -776,7 +776,7 @@ async function processCommandInline(
   // Use importCtx.env if provided, otherwise fall back to process.env
   const env = importCtx?.env ?? process.env;
 
-  // Use invocationCwd for command execution if provided (allows agents in ~/.ma
+  // Use invocationCwd for command execution if provided (allows agents in ~/.mdflow
   // to run commands in the user's current directory), fall back to file directory
   const commandCwd = importCtx?.invocationCwd ?? currentFileDir;
 

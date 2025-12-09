@@ -29,7 +29,7 @@ export interface AgentFile {
  * Parse CLI arguments
  *
  * When a markdown file or subcommand is provided: ALL flags pass through
- * When no file is provided: ma's own flags are processed (--help)
+ * When no file is provided: md's own flags are processed (--help)
  */
 export function parseCliArgs(argv: string[]): CliArgs {
   const args = argv.slice(2);
@@ -258,7 +258,7 @@ export async function showInteractiveSelector(files: AgentFile[]): Promise<strin
 }
 
 /**
- * Handle ma's own commands (when no file provided)
+ * Handle md's own commands (when no file provided)
  * Returns result indicating if command was handled and optionally a selected file
  */
 export async function handleMaCommands(args: CliArgs): Promise<HandleMaCommandsResult> {

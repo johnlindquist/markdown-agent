@@ -6,8 +6,8 @@ import { writeFile, unlink } from "fs/promises";
 
 /**
  * Tests for EPIPE (broken pipe) handling.
- * When downstream closes the pipe early (e.g., `ma task.md | head -n 5`),
- * ma should exit gracefully with code 0 instead of crashing with EPIPE.
+ * When downstream closes the pipe early (e.g., `md task.md | head -n 5`),
+ * md should exit gracefully with code 0 instead of crashing with EPIPE.
  */
 
 describe("EPIPE handling", () => {
@@ -20,7 +20,7 @@ ${"A".repeat(10000)}
 `);
 
     try {
-      // Run ma and pipe to head -n 1, which will close the pipe early
+      // Run md and pipe to head -n 1, which will close the pipe early
       const proc = spawn({
         cmd: ["bash", "-c", `bun run ${join(process.cwd(), "src/index.ts")} ${tempFile} | head -n 1`],
         stdout: "pipe",

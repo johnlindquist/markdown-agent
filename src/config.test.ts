@@ -78,7 +78,7 @@ describe("findGitRoot", () => {
 });
 
 describe("loadProjectConfig", () => {
-  const testDir = join(tmpdir(), `ma-test-${Date.now()}`);
+  const testDir = join(tmpdir(), `md-test-${Date.now()}`);
   const subDir = join(testDir, "subdir");
 
   beforeEach(() => {
@@ -174,7 +174,7 @@ describe("loadProjectConfig", () => {
 });
 
 describe("loadFullConfig", () => {
-  const testDir = join(tmpdir(), `ma-full-test-${Date.now()}`);
+  const testDir = join(tmpdir(), `md-full-test-${Date.now()}`);
 
   beforeEach(() => {
     clearConfigCache();
@@ -246,7 +246,7 @@ describe("config cascade", () => {
   beforeEach(() => {
     clearConfigCache();
     // Use unique directory per test to avoid cache issues
-    testDir = join(tmpdir(), `ma-cascade-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    testDir = join(tmpdir(), `md-cascade-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     gitRoot = join(testDir, "repo");
     subDir = join(gitRoot, "packages", "app");
     // Create a fake git repo structure

@@ -1,6 +1,6 @@
 /**
  * Remote execution support for running agents from URLs
- * Enables npx-style execution: ma https://gist.github.com/user/setup.md
+ * Enables npx-style execution: md https://gist.github.com/user/setup.md
  */
 
 import { mkdtemp, rm } from "fs/promises";

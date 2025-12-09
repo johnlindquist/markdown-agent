@@ -423,7 +423,7 @@ test("expandImports runs bun commands in invocationCwd", async () => {
   expect(result).not.toContain("bun-agent-dir");
 });
 
-// Auto-run .md files with ma tests
+// Auto-run .md files with md tests
 describe("isMarkdownFileCommand", () => {
   test("detects simple .md file", () => {
     expect(isMarkdownFileCommand("foo.md")).toBe(true);

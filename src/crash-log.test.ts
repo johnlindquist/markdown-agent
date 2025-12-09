@@ -5,7 +5,7 @@ import { join } from "path";
 import { tmpdir } from "os";
 import { getAgentLogPath } from "./logger";
 
-const TEST_DIR = join(tmpdir(), "ma-crash-log-test");
+const TEST_DIR = join(tmpdir(), "md-crash-log-test");
 const CLI_PATH = join(import.meta.dir, "index.ts");
 
 describe("crash log pointer", () => {

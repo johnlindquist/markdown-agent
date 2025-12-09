@@ -5,7 +5,7 @@ import { join } from "path";
 
 /**
  * Tests for the --dry-run flag:
- * - --dry-run is consumed by ma (not passed to command)
+ * - --dry-run is consumed by md (not passed to command)
  * - Prints the resolved command with args
  * - Prints the final rendered prompt/body
  * - Prints estimated token count
@@ -14,7 +14,7 @@ import { join } from "path";
 
 describe("--dry-run flag consumption", () => {
   test("--dry-run flag is consumed and not passed to command", () => {
-    // Simulate CLI: ma file.md --dry-run --model opus
+    // Simulate CLI: md file.md --dry-run --model opus
     const cliArgs = ["--dry-run", "--model", "opus"];
     const remainingArgs = [...cliArgs];
 
@@ -80,7 +80,7 @@ describe("--dry-run integration", () => {
   let tempDir: string;
 
   beforeAll(async () => {
-    tempDir = await mkdtemp(join(tmpdir(), "ma-dry-run-test-"));
+    tempDir = await mkdtemp(join(tmpdir(), "md-dry-run-test-"));
   });
 
   afterAll(async () => {

@@ -4,7 +4,7 @@ import { validateFrontmatter } from "./schema";
 
 /**
  * Strip shebang line from content if present
- * Allows markdown files to be executable with #!/usr/bin/env ma
+ * Allows markdown files to be executable with #!/usr/bin/env md
  */
 export function stripShebang(content: string): string {
   const lines = content.split("\n");

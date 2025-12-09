@@ -19,7 +19,7 @@ Say: {{ message }}`;
 
     const { frontmatter, body } = parseFrontmatter(content);
 
-    // Simulate CLI: ma file.md "Hello World"
+    // Simulate CLI: md file.md "Hello World"
     const cliArgs = ["Hello World"];
     const templateVars: Record<string, string> = {};
 
@@ -47,7 +47,7 @@ args: [name, action]
 
     const { frontmatter, body } = parseFrontmatter(content);
 
-    // Simulate CLI: ma file.md "Alice" "run"
+    // Simulate CLI: md file.md "Alice" "run"
     const cliArgs = ["Alice", "run"];
     const templateVars: Record<string, string> = {};
 
@@ -73,7 +73,7 @@ args: [prompt]
 
     const { frontmatter, body } = parseFrontmatter(content);
 
-    // Simulate CLI: ma file.md "Write me a haiku about coding"
+    // Simulate CLI: md file.md "Write me a haiku about coding"
     const cliArgs = ["Write me a haiku about coding"];
     const templateVars: Record<string, string> = {};
 
@@ -142,7 +142,7 @@ Build {{ feature_name }}`;
 
     const { frontmatter, body } = parseFrontmatter(content);
 
-    // Simulate CLI: ma file.md --feature_name "Payments"
+    // Simulate CLI: md file.md --feature_name "Payments"
     const cliArgs = ["--feature_name", "Payments"];
 
     const namedVarFields = Object.keys(frontmatter)
@@ -172,7 +172,7 @@ Build {{ feature_name }}`;
 
 describe("flag hijacking", () => {
   test("--command flag is consumed and used as command", () => {
-    // Simulate CLI: ma generic.md --command claude --model opus
+    // Simulate CLI: md generic.md --command claude --model opus
     const cliArgs = ["--command", "claude", "--model", "opus"];
 
     // Extract --command flag (same logic as index.ts)

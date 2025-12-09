@@ -12,14 +12,14 @@ const PROJECT_ROOT = resolve(import.meta.dir, "..");
  *
  * Ensures all system/status messages go to stderr,
  * keeping stdout exclusively for agent output.
- * This enables clean piping like: git diff | ma review.md > review.txt
+ * This enables clean piping like: git diff | md review.md > review.txt
  */
 
 describe("Output Stream Separation", () => {
   let tempDir: string;
 
   beforeAll(async () => {
-    tempDir = await mkdtemp(join(tmpdir(), "ma-streams-test-"));
+    tempDir = await mkdtemp(join(tmpdir(), "md-streams-test-"));
   });
 
   afterAll(async () => {
@@ -216,7 +216,7 @@ Echo test content`;
       const stderr = await new Response(proc.stderr).text();
       await proc.exited;
 
-      // Any ma-specific status/error messages should be on stderr
+      // Any md-specific status/error messages should be on stderr
       // stdout should only contain command output (or be empty if command fails early)
       // The key assertion: no "Fetching:", "Saved to:", "Resolving:", etc on stdout
       expect(stdout).not.toContain("Fetching:");

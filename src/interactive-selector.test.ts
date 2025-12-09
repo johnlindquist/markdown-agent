@@ -11,7 +11,7 @@ describe("findAgentFiles", () => {
 
   beforeEach(() => {
     // Create a temporary test directory
-    testDir = join(tmpdir(), `ma-test-${Date.now()}`);
+    testDir = join(tmpdir(), `md-test-${Date.now()}`);
     mkdirSync(testDir, { recursive: true });
 
     // Save original values

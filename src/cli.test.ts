@@ -42,7 +42,7 @@ describe("parseCliArgs", () => {
     expect(createResult.passthroughArgs).toEqual(["-g"]);
   });
 
-  test("ma flags pass through when file is provided", () => {
+  test("md flags pass through when file is provided", () => {
     const result = parseCliArgs(["node", "script", "DEMO.md", "--help", "--model", "opus"]);
     expect(result.filePath).toBe("DEMO.md");
     expect(result.help).toBe(false);

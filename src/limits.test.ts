@@ -78,7 +78,7 @@ describe("limits", () => {
 });
 
 describe("file import size limits", () => {
-  const testDir = join(tmpdir(), `ma-limits-test-${Date.now()}`);
+  const testDir = join(tmpdir(), `md-limits-test-${Date.now()}`);
   const smallFilePath = join(testDir, "small.txt");
   const largeFilePath = join(testDir, "large.txt");
 

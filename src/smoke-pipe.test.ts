@@ -11,7 +11,7 @@ import { mkdir, writeFile, rm } from "fs/promises";
  */
 
 describe("smoke: pipe between agents", () => {
-  const testDir = join(tmpdir(), `ma-smoke-pipe-${Date.now()}`);
+  const testDir = join(tmpdir(), `md-smoke-pipe-${Date.now()}`);
   const indexPath = join(process.cwd(), "src/index.ts");
 
   beforeAll(async () => {

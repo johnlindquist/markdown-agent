@@ -84,7 +84,7 @@ Line 3`;
   });
 
   test("strips shebang line before parsing", () => {
-    const content = `#!/usr/bin/env ma
+    const content = `#!/usr/bin/env md
 ---
 model: gpt-5
 ---
@@ -95,7 +95,7 @@ Body content`;
   });
 
   test("handles shebang without frontmatter", () => {
-    const content = `#!/usr/bin/env ma
+    const content = `#!/usr/bin/env md
 Just some content`;
     const result = parseFrontmatter(content);
     expect(result.frontmatter).toEqual({});
@@ -105,7 +105,7 @@ Just some content`;
 
 describe("stripShebang", () => {
   test("removes shebang line", () => {
-    const content = `#!/usr/bin/env ma
+    const content = `#!/usr/bin/env md
 rest of content`;
     expect(stripShebang(content)).toBe("rest of content");
   });
@@ -118,7 +118,7 @@ rest of content`;
   test("handles various shebang formats", () => {
     expect(stripShebang("#!/bin/bash\nrest")).toBe("rest");
     expect(stripShebang("#! /usr/bin/env node\nrest")).toBe("rest");
-    expect(stripShebang("#!/usr/local/bin/ma\nrest")).toBe("rest");
+    expect(stripShebang("#!/usr/local/bin/md\nrest")).toBe("rest");
   });
 });
 
