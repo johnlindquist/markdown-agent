@@ -1,3 +1,10 @@
+## [2.18.1](https://github.com/johnlindquist/mdflow/compare/v2.18.0...v2.18.1) (2025-12-09)
+
+
+### Bug Fixes
+
+* **setup:** search PATH for .md files in suffix alias handler ([e5dea16](https://github.com/johnlindquist/mdflow/commit/e5dea16bb9a079f659c798cbc5e772a6117aad4d))
+
 # [2.18.0](https://github.com/johnlindquist/mdflow/compare/v2.17.1...v2.18.0) (2025-12-09)
 
 
