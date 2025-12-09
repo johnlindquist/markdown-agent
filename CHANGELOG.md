@@ -1,3 +1,10 @@
+# [2.18.0](https://github.com/johnlindquist/mdflow/compare/v2.17.1...v2.18.0) (2025-12-09)
+
+
+### Features
+
+* **selector:** add split-pane file preview to interactive picker ([8441d38](https://github.com/johnlindquist/mdflow/commit/8441d383c000f4346fc9e63439f8f009179d792e))
+
 ## [2.17.1](https://github.com/johnlindquist/mdflow/compare/v2.17.0...v2.17.1) (2025-12-09)
 
 
