@@ -6,11 +6,13 @@ import ignore from "ignore";
 import { resilientFetch } from "./fetch";
 import { MAX_INPUT_SIZE, FileSizeLimitError, exceedsLimit } from "./limits";
 import { countTokens, getContextLimit } from "./tokenizer";
+import { Semaphore, DEFAULT_CONCURRENCY_LIMIT } from "./concurrency";
 
 // Re-export pipeline components for direct access
 export { parseImports, hasImportsInContent, isGlobPattern, parseLineRange, parseSymbolExtraction } from "./imports-parser";
 export { injectImports, createResolvedImport } from "./imports-injector";
 export type { ImportAction, ResolvedImport, SystemEnvironment } from "./imports-types";
+export { Semaphore, DEFAULT_CONCURRENCY_LIMIT } from "./concurrency";
 
 /**
  * Expand markdown imports, URL imports, and command inlines
@@ -810,19 +812,99 @@ async function processCommandInline(
   }
 }
 
+/** Import types for categorizing imports during parallel resolution */
+type ParsedImport =
+  | { type: 'file'; full: string; path: string; index: number }
+  | { type: 'url'; full: string; url: string; index: number }
+  | { type: 'command'; full: string; command: string; index: number };
+
+/** Result of resolving an import */
+interface ResolvedImportResult {
+  import: ParsedImport;
+  content: string;
+}
+
+/**
+ * Parse all imports from content in a single pass
+ * Returns imports sorted by their position in the content
+ */
+function parseAllImports(content: string): ParsedImport[] {
+  const imports: ParsedImport[] = [];
+  let match;
+
+  // Parse file imports
+  FILE_IMPORT_PATTERN.lastIndex = 0;
+  while ((match = FILE_IMPORT_PATTERN.exec(content)) !== null) {
+    imports.push({
+      type: 'file',
+      full: match[0],
+      path: match[1],
+      index: match.index,
+    });
+  }
+
+  // Parse URL imports
+  URL_IMPORT_PATTERN.lastIndex = 0;
+  while ((match = URL_IMPORT_PATTERN.exec(content)) !== null) {
+    imports.push({
+      type: 'url',
+      full: match[0],
+      url: match[1],
+      index: match.index,
+    });
+  }
+
+  // Parse command inlines
+  COMMAND_INLINE_PATTERN.lastIndex = 0;
+  while ((match = COMMAND_INLINE_PATTERN.exec(content)) !== null) {
+    imports.push({
+      type: 'command',
+      full: match[0],
+      command: match[1],
+      index: match.index,
+    });
+  }
+
+  // Sort by index to maintain order
+  imports.sort((a, b) => a.index - b.index);
+
+  return imports;
+}
+
+/**
+ * Inject resolved imports back into content
+ * Processes in reverse order to preserve indices
+ */
+function injectResolvedImports(content: string, resolved: ResolvedImportResult[]): string {
+  let result = content;
+
+  // Sort by index descending to process from end to start (preserves indices)
+  const sortedResolved = [...resolved].sort((a, b) => b.import.index - a.import.index);
+
+  for (const { import: imp, content: replacement } of sortedResolved) {
+    result = result.slice(0, imp.index) + replacement + result.slice(imp.index + imp.full.length);
+  }
+
+  return result;
+}
+
 /**
  * Expand all imports, URL imports, and command inlines in content
  *
  * This is the main entry point that orchestrates the three-phase pipeline:
- * 1. Parse: Find all imports in the content
- * 2. Resolve: Fetch content for each import (files, URLs, commands)
+ * 1. Parse: Find all imports in the content (single pass)
+ * 2. Resolve: Fetch content for each import in parallel (with concurrency limit)
  * 3. Inject: Replace import markers with resolved content
+ *
+ * The parallel resolution uses a semaphore to limit concurrent I/O operations,
+ * preventing file descriptor exhaustion when processing many imports.
  *
  * @param content - The markdown content to process
  * @param currentFileDir - Directory of the current file (for relative imports)
  * @param stack - Set of files already being processed (for circular detection)
  * @param verbose - Whether to log import/command activity
- * @param resolvedImports - Optional array to collect resolved import paths for introspection
+ * @param contextOrTracker - Optional ImportContext or array to collect resolved import paths
+ * @param concurrencyLimit - Maximum concurrent I/O operations (default: 10)
  * @returns Content with all imports and commands expanded
  */
 export async function expandImports(
@@ -830,78 +912,56 @@ export async function expandImports(
   currentFileDir: string,
   stack: ImportStack = new Set(),
   verbose: boolean = false,
-  contextOrTracker?: ImportContext | ResolvedImportsTracker
+  contextOrTracker?: ImportContext | ResolvedImportsTracker,
+  concurrencyLimit: number = DEFAULT_CONCURRENCY_LIMIT
 ): Promise<string> {
   // Normalize the 5th parameter - can be either ImportContext or ResolvedImportsTracker (for backward compat)
   const importCtx: ImportContext = Array.isArray(contextOrTracker)
     ? { resolvedImports: contextOrTracker }
     : (contextOrTracker ?? {});
-  const resolvedImports = importCtx.resolvedImports;
-  let result = content;
+  const resolvedImportsTracker = importCtx.resolvedImports;
 
-  // Process file imports first
-  // We need to process them one at a time due to async and potential path changes
-  let match;
+  // Phase 1: Parse all imports in a single pass
+  const imports = parseAllImports(content);
 
-  // Reset regex state and find all file imports
-  FILE_IMPORT_PATTERN.lastIndex = 0;
-  const fileImports: Array<{ full: string; path: string; index: number }> = [];
+  // If no imports, return content as-is
+  if (imports.length === 0) {
+    return content;
+  }
 
-  while ((match = FILE_IMPORT_PATTERN.exec(content)) !== null) {
-    fileImports.push({
-      full: match[0],
-      path: match[1],
-      index: match.index,
+  // Create semaphore for concurrency limiting
+  const semaphore = new Semaphore(concurrencyLimit);
+
+  // Phase 2: Resolve all imports in parallel with concurrency limiting
+  const resolvePromises = imports.map(async (imp): Promise<ResolvedImportResult> => {
+    return semaphore.run(async () => {
+      let resolvedContent: string;
+
+      switch (imp.type) {
+        case 'file':
+          resolvedContent = await processFileImport(imp.path, currentFileDir, stack, verbose, importCtx);
+          break;
+        case 'url':
+          resolvedContent = await processUrlImport(imp.url, verbose);
+          // Track URL imports
+          if (resolvedImportsTracker) {
+            resolvedImportsTracker.push(imp.url);
+          }
+          break;
+        case 'command':
+          resolvedContent = await processCommandInline(imp.command, currentFileDir, verbose, importCtx);
+          break;
+      }
+
+      return { import: imp, content: resolvedContent };
     });
-  }
+  });
 
-  // Process file imports in reverse order to preserve indices
-  for (const imp of fileImports.reverse()) {
-    const replacement = await processFileImport(imp.path, currentFileDir, stack, verbose, importCtx);
-    result = result.slice(0, imp.index) + replacement + result.slice(imp.index + imp.full.length);
-  }
+  // Wait for all resolutions to complete
+  const resolvedImports = await Promise.all(resolvePromises);
 
-  // Process URL imports
-  URL_IMPORT_PATTERN.lastIndex = 0;
-  const urlImports: Array<{ full: string; url: string; index: number }> = [];
-
-  while ((match = URL_IMPORT_PATTERN.exec(result)) !== null) {
-    urlImports.push({
-      full: match[0],
-      url: match[1],
-      index: match.index,
-    });
-  }
-
-  // Process URL imports in reverse order to preserve indices
-  for (const imp of urlImports.reverse()) {
-    const replacement = await processUrlImport(imp.url, verbose);
-    // Track URL imports
-    if (resolvedImports) {
-      resolvedImports.push(imp.url);
-    }
-    result = result.slice(0, imp.index) + replacement + result.slice(imp.index + imp.full.length);
-  }
-
-  // Process command inlines
-  COMMAND_INLINE_PATTERN.lastIndex = 0;
-  const commandInlines: Array<{ full: string; command: string; index: number }> = [];
-
-  while ((match = COMMAND_INLINE_PATTERN.exec(result)) !== null) {
-    commandInlines.push({
-      full: match[0],
-      command: match[1],
-      index: match.index,
-    });
-  }
-
-  // Process command inlines in reverse order to preserve indices
-  for (const cmd of commandInlines.reverse()) {
-    const replacement = await processCommandInline(cmd.command, currentFileDir, verbose, importCtx);
-    result = result.slice(0, cmd.index) + replacement + result.slice(cmd.index + cmd.full.length);
-  }
-
-  return result;
+  // Phase 3: Inject resolved content back into the original
+  return injectResolvedImports(content, resolvedImports);
 }
 
 /**

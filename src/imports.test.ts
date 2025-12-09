@@ -482,3 +482,111 @@ test("expandImports preserves normal shell commands", async () => {
   const result = await expandImports(content, testDir);
   expect(result).toContain("hello.txt");
 });
+
+// Parallel resolution tests
+describe("parallel import resolution", () => {
+  test("resolves multiple file imports in parallel", async () => {
+    // Create multiple test files
+    await Bun.write(join(testDir, "parallel-a.md"), "Content A");
+    await Bun.write(join(testDir, "parallel-b.md"), "Content B");
+    await Bun.write(join(testDir, "parallel-c.md"), "Content C");
+
+    const content = "@./parallel-a.md @./parallel-b.md @./parallel-c.md";
+    const result = await expandImports(content, testDir);
+
+    expect(result).toBe("Content A Content B Content C");
+  });
+
+  test("resolves mixed imports (files, commands) in parallel", async () => {
+    await Bun.write(join(testDir, "parallel-mixed.md"), "File content");
+
+    const content = "@./parallel-mixed.md !`echo Command output`";
+    const result = await expandImports(content, testDir);
+
+    expect(result).toContain("File content");
+    expect(result).toContain("Command output");
+  });
+
+  test("maintains correct order when resolving in parallel", async () => {
+    // Create files with distinct content to verify ordering
+    await Bun.write(join(testDir, "order-1.md"), "FIRST");
+    await Bun.write(join(testDir, "order-2.md"), "SECOND");
+    await Bun.write(join(testDir, "order-3.md"), "THIRD");
+
+    const content = "Start @./order-1.md Middle @./order-2.md End @./order-3.md Final";
+    const result = await expandImports(content, testDir);
+
+    expect(result).toBe("Start FIRST Middle SECOND End THIRD Final");
+  });
+
+  test("handles parallel resolution with concurrency limit", async () => {
+    // Create many files to test concurrency limiting
+    const fileCount = 20;
+    for (let i = 0; i < fileCount; i++) {
+      await Bun.write(join(testDir, `concurrent-${i}.md`), `File ${i}`);
+    }
+
+    // Build content with many imports
+    const imports = Array.from({ length: fileCount }, (_, i) => `@./concurrent-${i}.md`);
+    const content = imports.join(" ");
+
+    // Use a low concurrency limit to test the semaphore
+    const result = await expandImports(content, testDir, new Set(), false, undefined, 3);
+
+    // Verify all files were resolved
+    for (let i = 0; i < fileCount; i++) {
+      expect(result).toContain(`File ${i}`);
+    }
+  });
+
+  test("parallel resolution still detects cycles correctly", async () => {
+    // Create files that form a cycle
+    await Bun.write(join(testDir, "cycle-parallel-a.md"), "A imports @./cycle-parallel-b.md");
+    await Bun.write(join(testDir, "cycle-parallel-b.md"), "B imports @./cycle-parallel-a.md");
+
+    const content = "@./cycle-parallel-a.md";
+    await expect(expandImports(content, testDir)).rejects.toThrow("Circular import detected");
+  });
+
+  test("parallel resolution handles errors correctly", async () => {
+    // One valid file, one missing
+    await Bun.write(join(testDir, "exists.md"), "I exist");
+
+    const content = "@./exists.md @./does-not-exist.md";
+    await expect(expandImports(content, testDir)).rejects.toThrow("Import not found");
+  });
+
+  test("parallel resolution with URL and file imports", async () => {
+    await Bun.write(join(testDir, "with-url.md"), "Local file");
+
+    const content = "@./with-url.md @https://jsonplaceholder.typicode.com/posts/1";
+    const result = await expandImports(content, testDir);
+
+    expect(result).toContain("Local file");
+    expect(result).not.toContain("@https://");
+  });
+
+  test("concurrency limit of 1 processes sequentially", async () => {
+    // This tests that the semaphore actually limits concurrency
+    await Bun.write(join(testDir, "seq-1.md"), "First");
+    await Bun.write(join(testDir, "seq-2.md"), "Second");
+
+    const content = "@./seq-1.md @./seq-2.md";
+    const result = await expandImports(content, testDir, new Set(), false, undefined, 1);
+
+    expect(result).toBe("First Second");
+  });
+
+  test("parallel nested imports are handled correctly", async () => {
+    // Create nested import structure
+    await Bun.write(join(testDir, "nest-parent-1.md"), "Parent1 @./nest-child.md end1");
+    await Bun.write(join(testDir, "nest-parent-2.md"), "Parent2 @./nest-child.md end2");
+    await Bun.write(join(testDir, "nest-child.md"), "Child");
+
+    // Both parents import the same child - should work in parallel
+    const content = "@./nest-parent-1.md @./nest-parent-2.md";
+    const result = await expandImports(content, testDir);
+
+    expect(result).toBe("Parent1 Child end1 Parent2 Child end2");
+  });
+});

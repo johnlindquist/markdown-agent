@@ -4,6 +4,9 @@
  * Takes ImportActions and fetches their content via I/O operations.
  * This is the impure part of the pipeline that interacts with the filesystem,
  * network, and shell.
+ *
+ * Supports parallel resolution with configurable concurrency limiting to
+ * prevent file descriptor exhaustion when processing many imports.
  */
 
 import type {
@@ -16,6 +19,7 @@ import type {
   CommandImportAction,
   SymbolImportAction,
 } from './imports-types';
+import { Semaphore, DEFAULT_CONCURRENCY_LIMIT } from './concurrency';
 
 /**
  * Extract lines from content by range
@@ -339,24 +343,36 @@ async function resolveSingleImport(
 }
 
 /**
- * Resolve all import actions
+ * Resolve all import actions in parallel with concurrency limiting
+ *
+ * Uses a semaphore to limit the number of concurrent I/O operations,
+ * preventing file descriptor exhaustion when processing many imports.
  *
  * @param actions - Array of import actions to resolve
  * @param env - System environment for I/O operations
  * @param stack - Set of files being processed (for circular detection)
+ * @param concurrencyLimit - Maximum concurrent operations (default: 10)
  * @returns Array of resolved imports with content
  */
 export async function resolveImports(
   actions: ImportAction[],
   env: SystemEnvironment,
-  stack: Set<string> = new Set()
+  stack: Set<string> = new Set(),
+  concurrencyLimit: number = DEFAULT_CONCURRENCY_LIMIT
 ): Promise<ResolvedImport[]> {
-  const resolved: ResolvedImport[] = [];
-
-  for (const action of actions) {
-    const content = await resolveSingleImport(action, env, stack);
-    resolved.push({ action, content });
+  if (actions.length === 0) {
+    return [];
   }
 
-  return resolved;
+  const semaphore = new Semaphore(concurrencyLimit);
+
+  // Resolve all imports in parallel with concurrency limiting
+  const resolvePromises = actions.map(async (action): Promise<ResolvedImport> => {
+    return semaphore.run(async () => {
+      const content = await resolveSingleImport(action, env, stack);
+      return { action, content };
+    });
+  });
+
+  return Promise.all(resolvePromises);
 }
