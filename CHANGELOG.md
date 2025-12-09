@@ -1,3 +1,11 @@
+## [2.15.2](https://github.com/johnlindquist/markdown-agent/compare/v2.15.1...v2.15.2) (2025-12-09)
+
+
+### Bug Fixes
+
+* make interactive-selector tests resilient to ~/.ma files ([50c1a49](https://github.com/johnlindquist/markdown-agent/commit/50c1a4965368db2e814b5732a9580d63f66fc68f))
+* run inline commands in invocation directory, add _cwd override ([79332b5](https://github.com/johnlindquist/markdown-agent/commit/79332b51fbd76479944d8fb1b9ae4696d9b4fbb4))
+
 ## [2.15.1](https://github.com/johnlindquist/markdown-agent/compare/v2.15.0...v2.15.1) (2025-12-09)
 
 
