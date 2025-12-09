@@ -1,3 +1,11 @@
+## [2.16.1](https://github.com/johnlindquist/mdflow/compare/v2.16.0...v2.16.1) (2025-12-09)
+
+
+### Bug Fixes
+
+* trigger build ([b0de400](https://github.com/johnlindquist/mdflow/commit/b0de400e00b8a45330e415c5d7b93d9c3bc39bb9))
+* update repository URL from markdown-agent to mdflow ([8a49ecd](https://github.com/johnlindquist/mdflow/commit/8a49ecde6486297be0421625274adefb77583dd3))
+
 # [2.16.0](https://github.com/johnlindquist/markdown-agent/compare/v2.15.2...v2.16.0) (2025-12-09)
 
 
