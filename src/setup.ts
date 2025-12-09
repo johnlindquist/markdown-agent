@@ -40,8 +40,10 @@ export PATH="$HOME/.mdflow:$PATH"
 # Project agents (.mdflow) - auto-add local .mdflow/ to PATH when entering directories
 # This function runs on each directory change to update PATH dynamically
 _mdflow_chpwd() {
-  # Remove any previous .mdflow paths from PATH
-  PATH=$(echo "$PATH" | tr ':' '\\n' | grep -v '/\\.mdflow$' | tr '\\n' ':' | sed 's/:$//')
+  # Remove project .mdflow paths from PATH, but keep ~/.mdflow (user agents)
+  # Project paths have format: /path/to/project/.mdflow (more than 3 segments)
+  # User path has format: /Users/name/.mdflow (exactly 3 segments)
+  PATH=$(echo "$PATH" | tr ':' '\\n' | grep -vE '^(/[^/]+){3,}/\\.mdflow$' | tr '\\n' ':' | sed 's/:$//')
   # Add current directory's .mdflow if it exists
   if [[ -d ".mdflow" ]]; then
     export PATH="$PWD/.mdflow:$PATH"

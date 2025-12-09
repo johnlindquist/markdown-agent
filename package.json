@@ -30,6 +30,7 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "@inquirer/core": "^10.1.11",
     "@inquirer/prompts": "^8.0.2",
     "gpt-tokenizer": "^3.4.0",
     "ignore": "^7.0.5",

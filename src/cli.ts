@@ -1,9 +1,9 @@
-import { select } from "@inquirer/prompts";
 import { Glob } from "bun";
 import { basename, join } from "path";
 import { realpathSync } from "fs";
 import { homedir } from "os";
 import { EarlyExitRequest, UserCancelledError } from "./errors";
+import { showFileSelectorWithPreview } from "./file-selector";
 
 export interface CliArgs {
   filePath: string;
@@ -234,27 +234,10 @@ export function getUserAgentsDir(): string {
 }
 
 /**
- * Show interactive file picker and return selected file path
+ * Show interactive file picker with preview and return selected file path
  */
 export async function showInteractiveSelector(files: AgentFile[]): Promise<string | undefined> {
-  if (files.length === 0) {
-    return undefined;
-  }
-
-  try {
-    const selected = await select({
-      message: "Select an agent to run:",
-      choices: files.map(f => ({
-        name: f.name,
-        value: f.path,
-        description: f.source === "cwd" ? "(current directory)" : f.source,
-      })),
-    });
-    return selected;
-  } catch {
-    // User cancelled (Ctrl+C) or other error
-    return undefined;
-  }
+  return showFileSelectorWithPreview(files);
 }
 
 /**
