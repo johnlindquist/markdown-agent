@@ -1,6 +1,6 @@
 /**
  * Interactive command to create new agent files
- * Usage: ma create [options]
+ * Usage: md create [options]
  */
 
 import { input, select, confirm } from "@inquirer/prompts";
@@ -86,20 +86,20 @@ export async function runCreate(args: string[]): Promise<void> {
   // Handle help flag specially
   if (args.includes("--help") || args.includes("-h")) {
     console.log(`
-Usage: ma create [name] [flags]
+Usage: md create [name] [flags]
 
 Create a new markdown agent. Any unknown flags are added to frontmatter.
 
 Options:
   --name, -n       Agent name (e.g. 'task')
   --command, -c    Tool to run (claude, gpt, python, etc)
-  --project, -p    Save to project agents (.ma/)
-  --global, -g     Save to global agents (~/.ma/)
+  --project, -p    Save to project agents (.mdflow/)
+  --global, -g     Save to global agents (~/.mdflow/)
   --content        Initial prompt content
 
 Examples:
-  ma create task --command claude
-  ma create search -g --model perplexity
+  md create task --command claude
+  md create search -g --model perplexity
 `);
     return;
   }
@@ -143,12 +143,12 @@ Examples:
       choices: [
         { name: `Current Directory (${process.cwd()})`, value: "cwd" },
         {
-          name: "Project (.ma/)",
+          name: "Project (.mdflow/)",
           value: "project",
           description: "Shared with team",
         },
         {
-          name: "User (~/.ma/)",
+          name: "User (~/.mdflow/)",
           value: "user",
           description: "Personal global agents",
         },
@@ -225,7 +225,7 @@ Examples:
   // Show run command
   const relativePath =
     options.location === "cwd" ? `./${options.name}` : options.name;
-  let runCmd = `ma ${relativePath}`;
+  let runCmd = `md ${relativePath}`;
 
   // If we had to supply a command explicitly and it's not in the filename
   if (

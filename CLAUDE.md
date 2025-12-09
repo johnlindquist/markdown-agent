@@ -4,16 +4,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-**markdown-agent** (`ma`) is a CLI tool that executes AI agents defined as markdown files. It parses YAML frontmatter for configuration and passes keys directly as CLI flags to the specified command (claude, codex, gemini, copilot, or any other CLI tool).
+**mdflow** (`md`) is a CLI tool that executes AI agents defined as markdown files. It parses YAML frontmatter for configuration and passes keys directly as CLI flags to the specified command (claude, codex, gemini, copilot, or any other CLI tool).
 
 ## CLI Subcommands
 
 ```bash
-ma <file.md> [flags]     # Run an agent
-ma create [name]         # Create a new agent file
-ma setup                 # Configure shell (PATH, aliases)
-ma logs                  # Show agent log directory
-ma help                  # Show help
+md <file.md> [flags]     # Run an agent
+md create [name]         # Create a new agent file
+md setup                 # Configure shell (PATH, aliases)
+md logs                  # Show agent log directory
+md help                  # Show help
 ```
 
 ## Development Commands
@@ -32,7 +32,7 @@ bun test --test-name-pattern "parses command"
 bun run src/index.ts task.claude.md
 
 # Or using the alias
-bun run ma task.claude.md
+bun run md task.claude.md
 ```
 
 ## Architecture
@@ -56,7 +56,7 @@ bun run ma task.claude.md
   - `runCommand()`: Spawns the command with positional args
 
 - **`config.ts`** - Global configuration
-  - Loads defaults from `~/.markdown-agent/config.yaml`
+  - Loads defaults from `~/.mdflow/config.yaml`
   - Built-in defaults: All commands default to print mode
   - `getCommandDefaults()`: Get defaults for a command
   - `applyDefaults()`: Merge defaults with frontmatter
@@ -80,7 +80,7 @@ bun run ma task.claude.md
 
 - **`template.ts`** - LiquidJS-powered template engine for variable substitution
 
-- **`logger.ts`** - Structured logging with pino (logs to `~/.markdown-agent/logs/<agent>/`)
+- **`logger.ts`** - Structured logging with pino (logs to `~/.mdflow/logs/<agent>/`)
 
 ### Command Resolution
 
@@ -90,7 +90,7 @@ Commands are resolved in priority order:
 
 ### Frontmatter Keys
 
-**System keys** (consumed by ma, not passed to command):
+**System keys** (consumed by md, not passed to command):
 - `args`: Named positional arguments for template vars
 - `env` (object form): Sets process.env before execution
 - `$1`, `$2`, etc.: Map positional args to flags
@@ -137,7 +137,7 @@ task.gemini.md      # Print mode: gemini "..." (one-shot)
 task.i.gemini.md    # Interactive: gemini --prompt-interactive "..."
 ```
 
-### Global Config (`~/.markdown-agent/config.yaml`)
+### Global Config (`~/.mdflow/config.yaml`)
 
 Set default frontmatter per command:
 

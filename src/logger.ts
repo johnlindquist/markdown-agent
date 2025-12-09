@@ -1,8 +1,8 @@
 /**
- * Structured logging for markdown-agent internals
+ * Structured logging for mdflow internals
  *
- * Logs are always written to ~/.markdown-agent/logs/<agent-name>/
- * Use `ma --logs` to show the log directory
+ * Logs are always written to ~/.mdflow/logs/<agent-name>/
+ * Use `md logs` to show the log directory
  */
 
 import pino, { type Logger } from "pino";
@@ -10,7 +10,7 @@ import { homedir } from "os";
 import { mkdirSync, existsSync, readdirSync } from "fs";
 import { join, basename, dirname } from "path";
 
-const LOG_BASE_DIR = join(homedir(), ".markdown-agent", "logs");
+const LOG_BASE_DIR = join(homedir(), ".mdflow", "logs");
 
 // Ensure base log directory exists
 if (!existsSync(LOG_BASE_DIR)) {
@@ -56,7 +56,7 @@ let currentAgentLogPath: string | null = null;
 
 /**
  * Initialize logger for a specific agent file
- * Creates a log file at ~/.markdown-agent/logs/<agent-name>/debug.log
+ * Creates a log file at ~/.mdflow/logs/<agent-name>/debug.log
  */
 export function initLogger(agentFile: string): Logger {
   const agentName = basename(agentFile, ".md").replace(/\./g, "-");

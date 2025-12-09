@@ -12,7 +12,7 @@ export interface CliArgs {
   help: boolean;
 }
 
-/** Result of handling ma commands - can include a selected file from interactive picker */
+/** Result of handling md commands - can include a selected file from interactive picker */
 export interface HandleMaCommandsResult {
   handled: boolean;
   selectedFile?: string;
@@ -66,62 +66,62 @@ export function parseCliArgs(argv: string[]): CliArgs {
 
 function printHelp() {
   console.log(`
-Usage: ma <file.md> [flags for the command]
-       ma <command> [options]
+Usage: md <file.md> [flags for the command]
+       md <command> [options]
 
 Commands:
-  ma create [name] [flags]      Create a new agent file
-  ma setup                      Configure shell (PATH, aliases)
-  ma logs                       Show agent log directory
-  ma help                       Show this help
+  md create [name] [flags]      Create a new agent file
+  md setup                      Configure shell (PATH, aliases)
+  md logs                       Show agent log directory
+  md help                       Show this help
 
 Create options:
-  ma create                     Interactive agent creator
-  ma create task.claude.md      Create with name (auto-detects command)
-  ma create -n task -p          Create in project .ma/ folder
-  ma create -g --model gpt-4    Create globally with frontmatter
+  md create                     Interactive agent creator
+  md create task.claude.md      Create with name (auto-detects command)
+  md create -n task -p          Create in project .mdflow/ folder
+  md create -g --model gpt-4    Create globally with frontmatter
 
 Command resolution:
-  1. --command flag (e.g., ma task.md --command claude)
+  1. --command flag (e.g., md task.md --command claude)
   2. Filename pattern (e.g., task.claude.md → claude)
 
 Agent file discovery (in priority order):
-  1. Explicit path:      ma ./path/to/agent.md
+  1. Explicit path:      md ./path/to/agent.md
   2. Current directory:  ./
-  3. Project agents:     ./.ma/
-  4. User agents:        ~/.ma/
+  3. Project agents:     ./.mdflow/
+  4. User agents:        ~/.mdflow/
   5. $PATH directories
 
 All frontmatter keys are passed as CLI flags to the command.
-Global defaults can be set in ~/.markdown-agent/config.yaml
+Global defaults can be set in ~/.mdflow/config.yaml
 
 Remote execution:
-  ma supports running agents from URLs (npx-style).
+  md supports running agents from URLs (npx-style).
   On first use, you'll be prompted to trust the domain.
-  Trusted domains are stored in ~/.markdown-agent/known_hosts
+  Trusted domains are stored in ~/.mdflow/known_hosts
 
 Examples:
-  ma task.claude.md -p "print mode"
-  ma task.claude.md --model opus --verbose
-  ma commit.gemini.md
-  ma task.md --command claude
-  ma task.md -c gemini
-  ma task.claude.md --dry-run    # Preview without executing
-  ma https://example.com/agent.claude.md          # Remote execution
-  ma https://example.com/agent.claude.md --trust  # Skip trust prompt
+  md task.claude.md -p "print mode"
+  md task.claude.md --model opus --verbose
+  md commit.gemini.md
+  md task.md --command claude
+  md task.md -c gemini
+  md task.claude.md --dry-run    # Preview without executing
+  md https://example.com/agent.claude.md          # Remote execution
+  md https://example.com/agent.claude.md --trust  # Skip trust prompt
 
-Config file example (~/.markdown-agent/config.yaml):
+Config file example (~/.mdflow/config.yaml):
   commands:
     copilot:
       $1: prompt    # Map body to --prompt flag
 
-ma-specific flags (consumed, not passed to command):
+md-specific flags (consumed, not passed to command):
   --command, -c   Specify command to run
   --dry-run       Show resolved command and prompt without executing
   --trust         Skip trust prompt for remote URLs (TOFU bypass)
 
 Without arguments:
-  ma              Interactive agent picker (from ./.ma/, ~/.ma/, etc.)
+  md              Interactive agent picker (from ./.mdflow/, ~/.mdflow/, etc.)
 `);
 }
 
@@ -139,16 +139,16 @@ function normalizePath(filePath: string): string {
 }
 
 /** Project-level agent directory */
-const PROJECT_AGENTS_DIR = ".ma";
+const PROJECT_AGENTS_DIR = ".mdflow";
 
 /** User-level agent directory */
-const USER_AGENTS_DIR = join(homedir(), ".ma");
+const USER_AGENTS_DIR = join(homedir(), ".mdflow");
 
 /**
  * Find agent markdown files with priority order:
  * 1. Current directory (cwd)
- * 2. Project-level: ./.ma/
- * 3. User-level: ~/.ma/
+ * 2. Project-level: ./.mdflow/
+ * 3. User-level: ~/.mdflow/
  * 4. $PATH directories
  *
  * Returns files sorted by source priority (earlier sources take precedence)
@@ -172,31 +172,31 @@ export async function findAgentFiles(): Promise<AgentFile[]> {
     // Skip if cwd is not accessible
   }
 
-  // 2. Project-level: ./.ma/
+  // 2. Project-level: ./.mdflow/
   const projectAgentsPath = join(process.cwd(), PROJECT_AGENTS_DIR);
   try {
     for await (const file of glob.scan({ cwd: projectAgentsPath, absolute: true })) {
       const normalizedPath = normalizePath(file);
       if (!seenPaths.has(normalizedPath)) {
         seenPaths.add(normalizedPath);
-        files.push({ name: basename(file), path: normalizedPath, source: ".ma" });
+        files.push({ name: basename(file), path: normalizedPath, source: ".mdflow" });
       }
     }
   } catch {
-    // Skip if .ma/ doesn't exist
+    // Skip if .mdflow/ doesn't exist
   }
 
-  // 3. User-level: ~/.ma/
+  // 3. User-level: ~/.mdflow/
   try {
     for await (const file of glob.scan({ cwd: USER_AGENTS_DIR, absolute: true })) {
       const normalizedPath = normalizePath(file);
       if (!seenPaths.has(normalizedPath)) {
         seenPaths.add(normalizedPath);
-        files.push({ name: basename(file), path: normalizedPath, source: "~/.ma" });
+        files.push({ name: basename(file), path: normalizedPath, source: "~/.mdflow" });
       }
     }
   } catch {
-    // Skip if ~/.ma/ doesn't exist
+    // Skip if ~/.mdflow/ doesn't exist
   }
 
   // 4. $PATH directories

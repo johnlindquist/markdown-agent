@@ -1,6 +1,6 @@
 /**
- * Global and project-level configuration for markdown-agent
- * Loads defaults from ~/.markdown-agent/config.yaml
+ * Global and project-level configuration for mdflow
+ * Loads defaults from ~/.mdflow/config.yaml
  * Cascades with project configs: global → git root → CWD (later overrides earlier)
  *
  * This module provides both:
@@ -17,11 +17,11 @@ import type { AgentFrontmatter, GlobalConfig, CommandDefaults, RunContext } from
 // Re-export types for convenience
 export type { GlobalConfig, CommandDefaults } from "./types";
 
-const CONFIG_DIR = join(homedir(), ".markdown-agent");
+const CONFIG_DIR = join(homedir(), ".mdflow");
 const CONFIG_FILE = join(CONFIG_DIR, "config.yaml");
 
 /** Project config file names (checked in order) */
-const PROJECT_CONFIG_NAMES = ["ma.config.yaml", ".markdown-agent.yaml", ".markdown-agent.json"];
+const PROJECT_CONFIG_NAMES = ["mdflow.config.yaml", ".mdflow.yaml", ".mdflow.json"];
 
 /**
  * Built-in defaults (used when no config file exists)
@@ -143,7 +143,7 @@ export function findGitRoot(startPath: string): string | null {
 
 /**
  * Find project config file in a directory
- * Checks for ma.config.yaml, .markdown-agent.yaml, .markdown-agent.json
+ * Checks for mdflow.config.yaml, .mdflow.yaml, .mdflow.json
  * @returns The config file path if found, null otherwise
  */
 function findProjectConfigFile(dir: string): string | null {
@@ -219,7 +219,7 @@ export async function loadProjectConfig(cwd: string): Promise<GlobalConfig> {
 }
 
 /**
- * Load global config from ~/.markdown-agent/config.yaml
+ * Load global config from ~/.mdflow/config.yaml
  * Falls back to built-in defaults if file doesn't exist
  */
 export async function loadGlobalConfig(): Promise<GlobalConfig> {
@@ -360,7 +360,7 @@ export function mergeConfigs(base: GlobalConfig, override: GlobalConfig): Global
 }
 
 /**
- * Load global config from ~/.markdown-agent/config.yaml (no caching)
+ * Load global config from ~/.mdflow/config.yaml (no caching)
  * This is the RunContext-compatible version that doesn't use global state
  */
 export async function loadGlobalConfigFresh(): Promise<GlobalConfig> {

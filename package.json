@@ -1,5 +1,5 @@
 {
-  "name": "markdown-agent",
+  "name": "mdflow",
   "version": "2.16.0",
   "module": "src/index.ts",
   "type": "module",
@@ -8,12 +8,12 @@
     "url": "https://github.com/johnlindquist/markdown-agent.git"
   },
   "bin": {
-    "markdown-agent": "./src/index.ts",
-    "ma": "./src/index.ts"
+    "mdflow": "./src/index.ts",
+    "md": "./src/index.ts"
   },
   "scripts": {
     "test": "bun test --bail=1",
-    "ma": "bun run src/index.ts"
+    "md": "bun run src/index.ts"
   },
   "devDependencies": {
     "@semantic-release/changelog": "^6.0.3",

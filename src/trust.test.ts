@@ -49,7 +49,7 @@ describe("known hosts file operations", () => {
     tempDir = await Bun.file(join(tmpdir(), `trust-test-${Date.now()}`)).name;
     tempDir = join(tmpdir(), `trust-test-${Date.now()}`);
     await mkdir(tempDir, { recursive: true });
-    await mkdir(join(tempDir, ".markdown-agent"), { recursive: true });
+    await mkdir(join(tempDir, ".mdflow"), { recursive: true });
 
     // Store original HOME
     originalHome = process.env.HOME;
@@ -71,7 +71,7 @@ describe("known hosts file operations", () => {
 
   test("getKnownHostsPath returns expected path", () => {
     const path = getKnownHostsPath();
-    expect(path).toContain(".markdown-agent");
+    expect(path).toContain(".mdflow");
     expect(path).toContain("known_hosts");
   });
 
@@ -145,7 +145,7 @@ describe("saveKnownHosts file format", () => {
     const path = getKnownHostsPath();
     const content = await Bun.file(path).text();
 
-    expect(content).toContain("# markdown-agent known hosts");
+    expect(content).toContain("# mdflow known hosts");
     expect(content).toContain("format-test.example.com");
 
     // Restore original

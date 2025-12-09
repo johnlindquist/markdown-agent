@@ -59,7 +59,7 @@ async function readStdin(): Promise<string> {
 
 async function main() {
   // Handle EPIPE gracefully when downstream closes the pipe early
-  // (e.g., `ma task.md | head -n 5`)
+  // (e.g., `md task.md | head -n 5`)
   process.stdout.on("error", (err: NodeJS.ErrnoException) => {
     if (err.code === "EPIPE") {
       process.exit(0);
@@ -115,7 +115,7 @@ async function main() {
       cliArgs.help = true;
     }
 
-    // Handle ma's own commands when no file provided
+    // Handle md's own commands when no file provided
     let filePath = cliArgs.filePath;
     if (!filePath || subcommand === "help") {
       const result = await handleMaCommands(cliArgs);
@@ -124,10 +124,10 @@ async function main() {
         filePath = result.selectedFile;
       } else if (!result.handled) {
         // No file selected and no command handled - show usage
-        console.error("Usage: ma <file.md> [flags for command]");
-        console.error("       ma <command> [options]");
+        console.error("Usage: md <file.md> [flags for command]");
+        console.error("       md <command> [options]");
         console.error("\nCommands: create, setup, logs, help");
-        console.error("Run 'ma help' for more info");
+        console.error("Run 'md help' for more info");
         throw new ConfigurationError("No agent file specified", 1);
       }
     }
@@ -192,7 +192,7 @@ async function main() {
     getParseLogger().debug({ frontmatter: baseFrontmatter, bodyLength: rawBody.length }, "Frontmatter parsed");
 
     // Check for --command flag in CLI args (consumed, not passed to command)
-    // This allows: ma generic.md --command claude
+    // This allows: md generic.md --command claude
     let remainingArgs = [...passthroughArgs];
     let commandFromCli: string | undefined;
 
@@ -202,7 +202,7 @@ async function main() {
       remainingArgs.splice(commandFlagIndex, 2); // Consume --command and its value
     }
 
-    // Check for --dry-run flag (consumed by ma, not passed to command)
+    // Check for --dry-run flag (consumed by md, not passed to command)
     let dryRun = false;
     const dryRunIndex = remainingArgs.indexOf("--dry-run");
     if (dryRunIndex !== -1) {
@@ -210,7 +210,7 @@ async function main() {
       remainingArgs.splice(dryRunIndex, 1); // Consume it
     }
 
-    // Check for --trust flag (consumed by ma, bypasses TOFU prompts for remote URLs)
+    // Check for --trust flag (consumed by md, bypasses TOFU prompts for remote URLs)
     let trustFlag = false;
     const trustIndex = remainingArgs.indexOf("--trust");
     if (trustIndex !== -1) {
@@ -218,7 +218,7 @@ async function main() {
       remainingArgs.splice(trustIndex, 1); // Consume it
     }
 
-    // Check for --_interactive or -_i flag (consumed by ma, enables interactive mode)
+    // Check for --_interactive or -_i flag (consumed by md, enables interactive mode)
     let interactiveFromCli = false;
     const interactiveIndex = remainingArgs.findIndex(arg => arg === "--_interactive" || arg === "-_i");
     if (interactiveIndex !== -1) {
@@ -226,7 +226,7 @@ async function main() {
       remainingArgs.splice(interactiveIndex, 1); // Consume it
     }
 
-    // Check for --_cwd flag (consumed by ma, overrides working directory for !`cmd` inlines)
+    // Check for --_cwd flag (consumed by md, overrides working directory for !`cmd` inlines)
     let cwdFromCli: string | undefined;
     const cwdFlagIndex = remainingArgs.findIndex(arg => arg === "--_cwd");
     if (cwdFlagIndex !== -1 && cwdFlagIndex + 1 < remainingArgs.length) {

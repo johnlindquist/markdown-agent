@@ -46,7 +46,7 @@ describe("findAgentFiles", () => {
 
     const files = await findAgentFiles();
 
-    // Filter to only cwd files (ignoring ~/.ma files that may exist on user's system)
+    // Filter to only cwd files (ignoring ~/.mdflow files that may exist on user's system)
     const cwdFiles = files.filter(f => f.source === "cwd");
     expect(cwdFiles.length).toBe(2);
     expect(cwdFiles.map(f => f.name).sort()).toEqual(["agent1.md", "agent2.md"]);
@@ -68,7 +68,7 @@ describe("findAgentFiles", () => {
 
     const files = await findAgentFiles();
 
-    // Filter to only PATH files (ignoring ~/.ma files that may exist)
+    // Filter to only PATH files (ignoring ~/.mdflow files that may exist)
     const pathFiles = files.filter(f => f.source === pathDir);
     expect(pathFiles.length).toBe(1);
     expect(pathFiles[0].name).toBe("global-agent.md");
@@ -84,7 +84,7 @@ describe("findAgentFiles", () => {
 
     const files = await findAgentFiles();
 
-    // Filter to files from cwd or PATH only (ignoring ~/.ma files)
+    // Filter to files from cwd or PATH only (ignoring ~/.mdflow files)
     const relevantFiles = files.filter(f => f.source === "cwd" || f.source === testDir);
 
     // Should only appear once (from cwd, since we scan that first)
@@ -103,7 +103,7 @@ describe("findAgentFiles", () => {
 
     const files = await findAgentFiles();
 
-    // Filter out ~/.ma and .ma files - test only checks cwd and PATH are empty
+    // Filter out ~/.mdflow and .mdflow files - test only checks cwd and PATH are empty
     const cwdOrPathFiles = files.filter(f => f.source === "cwd");
     expect(cwdOrPathFiles).toEqual([]);
   });
@@ -118,7 +118,7 @@ describe("findAgentFiles", () => {
 
     // Should not throw
     const files = await findAgentFiles();
-    // Filter out ~/.ma and .ma files - test only checks non-existent PATH is handled
+    // Filter out ~/.mdflow and .mdflow files - test only checks non-existent PATH is handled
     const cwdOrPathFiles = files.filter(f => f.source === "cwd");
     expect(cwdOrPathFiles).toEqual([]);
   });
@@ -142,7 +142,7 @@ describe("findAgentFiles", () => {
 
     const files = await findAgentFiles();
 
-    // Filter to only cwd and our test PATH directories (ignoring ~/.ma files)
+    // Filter to only cwd and our test PATH directories (ignoring ~/.mdflow files)
     const relevantFiles = files.filter(f =>
       f.source === "cwd" || f.source === pathDir1 || f.source === pathDir2
     );
@@ -169,7 +169,7 @@ describe("findAgentFiles", () => {
 
     // Should not throw
     const files = await findAgentFiles();
-    // Filter to only cwd files (ignoring ~/.ma files)
+    // Filter to only cwd files (ignoring ~/.mdflow files)
     const cwdFiles = files.filter(f => f.source === "cwd");
     expect(cwdFiles.length).toBe(1);
     expect(cwdFiles[0].name).toBe("agent.md");

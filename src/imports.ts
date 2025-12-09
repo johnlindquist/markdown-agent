@@ -55,7 +55,7 @@ export interface ImportContext {
   /**
    * Working directory for command execution (!`cmd` inlines).
    * When set, commands run in this directory instead of the agent file's directory.
-   * This allows agents in ~/.ma to execute commands in the user's invocation directory.
+   * This allows agents in ~/.mdflow to execute commands in the user's invocation directory.
    */
   invocationCwd?: string;
 }

@@ -4,23 +4,23 @@ import { join } from "path";
 import { select, confirm } from "@inquirer/prompts";
 
 const SHELL_SNIPPET = `
-# markdown-agent: Treat .md files as executable agents
+# mdflow: Treat .md files as executable agents
 alias -s md='_handle_md'
 _handle_md() {
   local file="$1"
   shift
   # Pass file and any remaining args (--model, --silent, etc.) to handler
-  if command -v ma &>/dev/null; then
-    ma "$file" "$@"
+  if command -v md &>/dev/null; then
+    md "$file" "$@"
   else
-    echo "markdown-agent not installed. Install with: bun add -g markdown-agent"
+    echo "mdflow not installed. Install with: bun add -g mdflow"
     echo "Attempting to install now..."
     if command -v bun &>/dev/null; then
-      bun add -g markdown-agent && ma "$file" "$@"
+      bun add -g mdflow && md "$file" "$@"
     elif command -v npm &>/dev/null; then
-      npm install -g markdown-agent && ma "$file" "$@"
+      npm install -g mdflow && md "$file" "$@"
     else
-      echo "Neither bun nor npm found. Please install markdown-agent manually."
+      echo "Neither bun nor npm found. Please install mdflow manually."
       return 1
     fi
   fi
@@ -28,34 +28,34 @@ _handle_md() {
 `.trim();
 
 const PATH_SNIPPET = `
-# markdown-agent: Add agent directories to PATH
-# User agents (~/.ma) - run agents by name from anywhere
-export PATH="$HOME/.ma:$PATH"
+# mdflow: Add agent directories to PATH
+# User agents (~/.mdflow) - run agents by name from anywhere
+export PATH="$HOME/.mdflow:$PATH"
 
-# Project agents (.ma) - auto-add local .ma/ to PATH when entering directories
+# Project agents (.mdflow) - auto-add local .mdflow/ to PATH when entering directories
 # This function runs on each directory change to update PATH dynamically
-_ma_chpwd() {
-  # Remove any previous .ma paths from PATH
-  PATH=$(echo "$PATH" | tr ':' '\\n' | grep -v '/\\.ma$' | tr '\\n' ':' | sed 's/:$//')
-  # Add current directory's .ma if it exists
-  if [[ -d ".ma" ]]; then
-    export PATH="$PWD/.ma:$PATH"
+_mdflow_chpwd() {
+  # Remove any previous .mdflow paths from PATH
+  PATH=$(echo "$PATH" | tr ':' '\\n' | grep -v '/\\.mdflow$' | tr '\\n' ':' | sed 's/:$//')
+  # Add current directory's .mdflow if it exists
+  if [[ -d ".mdflow" ]]; then
+    export PATH="$PWD/.mdflow:$PATH"
   fi
 }
 
 # Hook into directory change (zsh)
 if [[ -n "$ZSH_VERSION" ]]; then
   autoload -Uz add-zsh-hook
-  add-zsh-hook chpwd _ma_chpwd
+  add-zsh-hook chpwd _mdflow_chpwd
 fi
 
 # Hook into directory change (bash)
 if [[ -n "$BASH_VERSION" ]]; then
-  PROMPT_COMMAND="_ma_chpwd\${PROMPT_COMMAND:+;$PROMPT_COMMAND}"
+  PROMPT_COMMAND="_mdflow_chpwd\${PROMPT_COMMAND:+;$PROMPT_COMMAND}"
 fi
 
 # Run once on shell start
-_ma_chpwd
+_mdflow_chpwd
 `.trim();
 
 type SetupFeature = "alias" | "path" | "both";
@@ -104,7 +104,7 @@ async function isAliasInstalled(configPath: string): Promise<boolean> {
 async function isPathInstalled(configPath: string): Promise<boolean> {
   try {
     const content = await Bun.file(configPath).text();
-    return content.includes("_ma_chpwd") || content.includes('$HOME/.ma:$PATH');
+    return content.includes("_mdflow_chpwd") || content.includes('$HOME/.mdflow:$PATH');
   } catch {
     return false;
   }
@@ -126,7 +126,7 @@ async function appendToConfig(configPath: string, snippet: string): Promise<void
  * Interactive setup wizard
  */
 export async function runSetup(): Promise<void> {
-  console.log("\n📝 markdown-agent Shell Setup\n");
+  console.log("\n📝 mdflow Shell Setup\n");
 
   const configs = findShellConfigs();
   const existingConfigs = configs.filter((c) => c.exists);
@@ -157,7 +157,7 @@ export async function runSetup(): Promise<void> {
     featureChoices.push({
       name: "PATH setup only",
       value: "path",
-      description: "Add ~/.ma and .ma/ to PATH - run agents by name",
+      description: "Add ~/.mdflow and .mdflow/ to PATH - run agents by name",
     });
   }
 
@@ -165,7 +165,7 @@ export async function runSetup(): Promise<void> {
     featureChoices.push({
       name: "Alias setup only",
       value: "alias",
-      description: "Run ./file.md instead of ma file.md",
+      description: "Run ./file.md instead of md file.md",
     });
   }
 
@@ -241,8 +241,8 @@ export async function runSetup(): Promise<void> {
 
   if (feature === "path" || feature === "both") {
     console.log("\nNow you can:");
-    console.log("  • Run agents from ~/.ma/ by name: my-agent.claude.md");
-    console.log("  • Run project agents from .ma/: task.claude.md");
+    console.log("  • Run agents from ~/.mdflow/ by name: my-agent.claude.md");
+    console.log("  • Run project agents from .mdflow/: task.claude.md");
   }
   if (feature === "alias" || feature === "both") {
     console.log("\nTry: ./examples/auto-detect.md --dry-run");

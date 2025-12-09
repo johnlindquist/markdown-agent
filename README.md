@@ -1,4 +1,4 @@
-# markdown-agent
+# mdflow
 
 ```bash
 review.claude.md                 # Run with Claude
@@ -67,7 +67,7 @@ The markdown body is passed as the final argument to the command.
 
 ## Unix Philosophy
 
-markdown-agent embraces the Unix philosophy:
+mdflow embraces the Unix philosophy:
 
 - **No magic mapping** - Frontmatter keys pass directly to the command
 - **Stdin/stdout** - Pipe data in and out
@@ -76,10 +76,10 @@ markdown-agent embraces the Unix philosophy:
 
 ```bash
 # Pipe input
-git diff | ma review.claude.md
+git diff | mdflow review.claude.md
 
 # Chain agents
-ma plan.claude.md | ma implement.codex.md
+mdflow plan.claude.md | mdflow implement.codex.md
 ```
 
 ---
@@ -87,7 +87,7 @@ ma plan.claude.md | ma implement.codex.md
 ## Installation
 
 ```bash
-npm install -g markdown-agent
+npm install -g mdflow
 # or
 bun install && bun link
 ```
@@ -96,18 +96,18 @@ bun install && bun link
 
 ```bash
 # Run with filename-inferred command
-ma task.claude.md
-ma task.gemini.md
+mdflow task.claude.md
+mdflow task.gemini.md
 
 # Override command via --command flag
-ma task.md --command claude
-ma task.md -c gemini
+mdflow task.md --command claude
+mdflow task.md -c gemini
 
 # Pass additional flags to the command
-ma task.claude.md --verbose --debug
+mdflow task.claude.md --verbose --debug
 ```
 
-> **Note:** Both `ma` and `markdown-agent` commands are available.
+> **Note:** Both `mdflow` and `md` commands are available.
 
 ---
 
@@ -124,7 +124,7 @@ If no command can be resolved, you'll get an error with instructions.
 
 ## Flag Hijacking
 
-Some CLI flags are "hijacked" by markdown-agent—they're consumed and never passed to the underlying command. This allows generic markdown files without command names to be executed.
+Some CLI flags are "hijacked" by mdflow—they're consumed and never passed to the underlying command. This allows generic markdown files without command names to be executed.
 
 ### `--command` / `-c`
 
@@ -132,11 +132,11 @@ Override the command for any markdown file:
 
 ```bash
 # Run a generic .md file with any command
-ma task.md --command claude
-ma task.md -c gemini
+mdflow task.md --command claude
+mdflow task.md -c gemini
 
 # Override the filename-inferred command
-ma task.claude.md --command gemini  # Runs gemini, not claude
+mdflow task.claude.md --command gemini  # Runs gemini, not claude
 ```
 
 ### `$varname` Fields
@@ -153,19 +153,19 @@ Build {{ feature_name }} in {{ target_dir }}.
 
 ```bash
 # Use defaults
-ma create.claude.md
+mdflow create.claude.md
 
 # Override with CLI flags (hijacked, not passed to command)
-ma create.claude.md --feature_name "Payments" --target_dir "src/billing"
+mdflow create.claude.md --feature_name "Payments" --target_dir "src/billing"
 ```
 
-The `--feature_name` and `--target_dir` flags are consumed by markdown-agent for template substitution—they won't be passed to the command.
+The `--feature_name` and `--target_dir` flags are consumed by mdflow for template substitution—they won't be passed to the command.
 
 ---
 
 ## Frontmatter Reference
 
-### System Keys (handled by markdown-agent)
+### System Keys (handled by mdflow)
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -234,15 +234,15 @@ Review this code with me interactively.
 Or use CLI flags:
 
 ```bash
-ma task.claude.md --_interactive  # Enable interactive mode
-ma task.claude.md -_i             # Short form
+mdflow task.claude.md --_interactive  # Enable interactive mode
+mdflow task.claude.md -_i             # Short form
 ```
 
 ---
 
 ## Global Configuration
 
-Set default frontmatter per command in `~/.markdown-agent/config.yaml`:
+Set default frontmatter per command in `~/.mdflow/config.yaml`:
 
 ```yaml
 commands:
@@ -323,7 +323,7 @@ Create a new feature called "{{ feature_name }}" in {{ target_dir }}.
 ```
 
 ```bash
-ma create-feature.claude.md "Auth" "src/features"
+mdflow create-feature.claude.md "Auth" "src/features"
 ```
 
 ### Environment Variables
@@ -378,7 +378,7 @@ Glob imports:
 - Respect `.gitignore` automatically
 - Include common exclusions (`node_modules`, `.git`, etc.)
 - Are limited to ~100,000 tokens by default
-- Set `MA_FORCE_CONTEXT=1` to override the token limit
+- Set `MDFLOW_FORCE_CONTEXT=1` to override the token limit
 
 Files are formatted as XML with path attributes:
 
@@ -443,7 +443,7 @@ Fetch content from URLs (markdown and JSON only):
 
 ## Environment Variables
 
-markdown-agent automatically loads `.env` files from the markdown file's directory.
+mdflow automatically loads `.env` files from the markdown file's directory.
 
 ### Loading Order
 
@@ -472,43 +472,43 @@ Environment variables are available:
 ## CLI Options
 
 ```
-Usage: ma <file.md> [any flags for the command]
-       ma <file.md> --command <cmd>
-       ma --setup
-       ma --logs
-       ma --help
+Usage: mdflow <file.md> [any flags for the command]
+       mdflow <file.md> --command <cmd>
+       mdflow --setup
+       mdflow --logs
+       mdflow --help
 
 Command resolution:
-  1. --command flag (e.g., ma task.md --command claude)
+  1. --command flag (e.g., mdflow task.md --command claude)
   2. Filename pattern (e.g., task.claude.md → claude)
 
 All frontmatter keys are passed as CLI flags to the command.
-Global defaults can be set in ~/.markdown-agent/config.yaml
+Global defaults can be set in ~/.mdflow/config.yaml
 
-ma-specific flags (consumed, not passed to command):
+mdflow-specific flags (consumed, not passed to command):
   --command, -c       Specify command to run
   --dry-run           Preview without executing
   --_interactive, -_i Enable interactive mode
 
 Examples:
-  ma task.claude.md -p "print mode"
-  ma task.claude.md --model opus --verbose
-  ma commit.gemini.md
-  ma task.md --command claude
-  ma task.md -c gemini
-  ma task.claude.md -_i  # Run in interactive mode
+  mdflow task.claude.md -p "print mode"
+  mdflow task.claude.md --model opus --verbose
+  mdflow commit.gemini.md
+  mdflow task.md --command claude
+  mdflow task.md -c gemini
+  mdflow task.claude.md -_i  # Run in interactive mode
 
 Without a file:
-  ma --setup    Configure shell to run .md files directly
-  ma --logs     Show log directory
-  ma --help     Show this help
+  mdflow --setup    Configure shell to run .md files directly
+  mdflow --logs     Show log directory
+  mdflow --help     Show this help
 ```
 
 ### Environment Variables
 
 | Variable | Description |
 |----------|-------------|
-| `MA_FORCE_CONTEXT` | Set to `1` to disable the 100k token limit for glob imports |
+| `MDFLOW_FORCE_CONTEXT` | Set to `1` to disable the 100k token limit for glob imports |
 | `NODE_ENV` | Controls which `.env.[NODE_ENV]` file is loaded (default: `development`) |
 
 ---
@@ -518,7 +518,7 @@ Without a file:
 Make `.md` files directly executable:
 
 ```bash
-ma --setup   # One-time setup
+mdflow --setup   # One-time setup
 ```
 
 Then run agents directly:
@@ -533,7 +533,7 @@ task.claude.md --verbose         # With passthrough args
 Add to `~/.zshrc`:
 
 ```bash
-alias -s md='ma'
+alias -s md='mdflow'
 export PATH="$HOME/agents:$PATH"  # Your agent library
 ```
 
@@ -570,6 +570,6 @@ git diff | review.claude.md      # Review staged changes
 
 - If no frontmatter is present, the file is printed as-is (unless command inferred from filename)
 - Template system uses [LiquidJS](https://liquidjs.com/) - supports conditionals, loops, and filters
-- Logs are always written to `~/.markdown-agent/logs/<agent-name>/` for debugging
+- Logs are always written to `~/.mdflow/logs/<agent-name>/` for debugging
 - Use `--logs` to show the log directory
 - Stdin is wrapped in `<stdin>` tags and prepended to the prompt

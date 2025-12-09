@@ -112,7 +112,7 @@ describe("Output Stream Separation", () => {
       await proc.exited;
 
       // Help text should be on stdout since user explicitly requested it
-      expect(stdout).toContain("Usage: ma");
+      expect(stdout).toContain("Usage: md");
       expect(stdout).toContain("Commands:");
     });
 

@@ -439,8 +439,8 @@ describe("agent selector simulation", () => {
 
     const agents = [
       { name: "agent1.md", value: "/path/to/agent1.md", description: "cwd" },
-      { name: "agent2.md", value: "/path/to/agent2.md", description: ".ma" },
-      { name: "agent3.md", value: "/path/to/agent3.md", description: "~/.ma" },
+      { name: "agent2.md", value: "/path/to/agent2.md", description: ".mdflow" },
+      { name: "agent3.md", value: "/path/to/agent3.md", description: "~/.mdflow" },
     ];
 
     const selected = await ui.select("Select an agent to run:", agents);
@@ -454,8 +454,8 @@ describe("agent selector simulation", () => {
 
     const agents = [
       { name: "agent1.md", value: "/path/to/agent1.md", description: "cwd" },
-      { name: "agent2.md", value: "/path/to/agent2.md", description: ".ma" },
-      { name: "agent3.md", value: "/path/to/agent3.md", description: "~/.ma" },
+      { name: "agent2.md", value: "/path/to/agent2.md", description: ".mdflow" },
+      { name: "agent3.md", value: "/path/to/agent3.md", description: "~/.mdflow" },
     ];
 
     const selected = await ui.select("Select an agent to run:", agents);

@@ -6,7 +6,7 @@
  * 2. Ask user to confirm execution
  * 3. Optionally remember the domain for future use
  *
- * Trusted domains are stored in ~/.markdown-agent/known_hosts
+ * Trusted domains are stored in ~/.mdflow/known_hosts
  */
 
 import { homedir } from "os";
@@ -15,7 +15,7 @@ import { mkdir } from "fs/promises";
 import { confirm, select } from "@inquirer/prompts";
 import type { AgentFrontmatter } from "./types";
 
-const CONFIG_DIR = join(homedir(), ".markdown-agent");
+const CONFIG_DIR = join(homedir(), ".mdflow");
 const KNOWN_HOSTS_FILE = join(CONFIG_DIR, "known_hosts");
 
 /** Maximum body preview length in characters */
@@ -34,7 +34,7 @@ export function extractDomain(url: string): string {
 }
 
 /**
- * Load trusted domains from ~/.markdown-agent/known_hosts
+ * Load trusted domains from ~/.mdflow/known_hosts
  * Returns an empty set if the file doesn't exist
  */
 export async function loadKnownHosts(): Promise<Set<string>> {
@@ -55,14 +55,14 @@ export async function loadKnownHosts(): Promise<Set<string>> {
 }
 
 /**
- * Save trusted domains to ~/.markdown-agent/known_hosts
+ * Save trusted domains to ~/.mdflow/known_hosts
  */
 export async function saveKnownHosts(hosts: Set<string>): Promise<void> {
   // Ensure config directory exists
   await mkdir(CONFIG_DIR, { recursive: true });
 
   const content = [
-    "# markdown-agent known hosts",
+    "# mdflow known hosts",
     "# Domains listed here are trusted for remote execution",
     "# Add one domain per line",
     "",

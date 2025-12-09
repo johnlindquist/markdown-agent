@@ -51,32 +51,32 @@ describe("parseCliArgs", () => {
 });
 
 describe("agent directory paths", () => {
-  test("getProjectAgentsDir returns .ma in cwd", () => {
+  test("getProjectAgentsDir returns .mdflow in cwd", () => {
     const dir = getProjectAgentsDir();
-    expect(dir).toBe(join(process.cwd(), ".ma"));
+    expect(dir).toBe(join(process.cwd(), ".mdflow"));
   });
 
-  test("getUserAgentsDir returns ~/.ma", () => {
+  test("getUserAgentsDir returns ~/.mdflow", () => {
     const dir = getUserAgentsDir();
-    expect(dir).toBe(join(homedir(), ".ma"));
+    expect(dir).toBe(join(homedir(), ".mdflow"));
   });
 });
 
 describe("findAgentFiles", () => {
-  const testProjectMaDir = join(process.cwd(), ".ma-test");
-  const testUserMaDir = join(homedir(), ".ma-test-user");
+  const testProjectDir = join(process.cwd(), ".mdflow-test");
+  const testUserDir = join(homedir(), ".mdflow-test-user");
 
   beforeEach(() => {
     // Create test directories
-    if (!existsSync(testProjectMaDir)) {
-      mkdirSync(testProjectMaDir, { recursive: true });
+    if (!existsSync(testProjectDir)) {
+      mkdirSync(testProjectDir, { recursive: true });
     }
   });
 
   afterEach(() => {
     // Cleanup test directories
-    if (existsSync(testProjectMaDir)) {
-      rmSync(testProjectMaDir, { recursive: true, force: true });
+    if (existsSync(testProjectDir)) {
+      rmSync(testProjectDir, { recursive: true, force: true });
     }
   });
 
@@ -87,24 +87,24 @@ describe("findAgentFiles", () => {
     expect(cwdFiles.length).toBeGreaterThan(0);
   });
 
-  test("finds files from .ma/ directory when present", async () => {
-    // Create a test .ma directory with a file
-    const maDir = join(process.cwd(), ".ma");
-    const testFile = join(maDir, "test-agent.claude.md");
+  test("finds files from .mdflow/ directory when present", async () => {
+    // Create a test .mdflow directory with a file
+    const mdflowDir = join(process.cwd(), ".mdflow");
+    const testFile = join(mdflowDir, "test-agent.claude.md");
 
     try {
-      mkdirSync(maDir, { recursive: true });
+      mkdirSync(mdflowDir, { recursive: true });
       writeFileSync(testFile, "---\nmodel: opus\n---\nTest agent");
 
       const files = await findAgentFiles();
-      const maFiles = files.filter(f => f.source === ".ma");
+      const mdflowFiles = files.filter(f => f.source === ".mdflow");
 
-      expect(maFiles.length).toBeGreaterThan(0);
-      expect(maFiles.some(f => f.name === "test-agent.claude.md")).toBe(true);
+      expect(mdflowFiles.length).toBeGreaterThan(0);
+      expect(mdflowFiles.some(f => f.name === "test-agent.claude.md")).toBe(true);
     } finally {
       // Cleanup
       if (existsSync(testFile)) rmSync(testFile);
-      if (existsSync(maDir)) rmSync(maDir, { recursive: true, force: true });
+      if (existsSync(mdflowDir)) rmSync(mdflowDir, { recursive: true, force: true });
     }
   });
 

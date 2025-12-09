@@ -95,9 +95,9 @@ describe("loadProjectConfig", () => {
     expect(config).toEqual({});
   });
 
-  test("loads ma.config.yaml from CWD", async () => {
+  test("loads mdflow.config.yaml from CWD", async () => {
     writeFileSync(
-      join(testDir, "ma.config.yaml"),
+      join(testDir, "mdflow.config.yaml"),
       `commands:
   claude:
     model: opus
@@ -108,9 +108,9 @@ describe("loadProjectConfig", () => {
     expect(config.commands?.claude?.model).toBe("opus");
   });
 
-  test("loads .markdown-agent.yaml from CWD", async () => {
+  test("loads .mdflow.yaml from CWD", async () => {
     writeFileSync(
-      join(testDir, ".markdown-agent.yaml"),
+      join(testDir, ".mdflow.yaml"),
       `commands:
   claude:
     model: sonnet
@@ -121,9 +121,9 @@ describe("loadProjectConfig", () => {
     expect(config.commands?.claude?.model).toBe("sonnet");
   });
 
-  test("loads .markdown-agent.json from CWD", async () => {
+  test("loads .mdflow.json from CWD", async () => {
     writeFileSync(
-      join(testDir, ".markdown-agent.json"),
+      join(testDir, ".mdflow.json"),
       JSON.stringify({
         commands: {
           claude: {
@@ -137,16 +137,16 @@ describe("loadProjectConfig", () => {
     expect(config.commands?.claude?.model).toBe("haiku");
   });
 
-  test("prefers ma.config.yaml over .markdown-agent.yaml", async () => {
+  test("prefers mdflow.config.yaml over .mdflow.yaml", async () => {
     writeFileSync(
-      join(testDir, "ma.config.yaml"),
+      join(testDir, "mdflow.config.yaml"),
       `commands:
   claude:
     model: opus
 `
     );
     writeFileSync(
-      join(testDir, ".markdown-agent.yaml"),
+      join(testDir, ".mdflow.yaml"),
       `commands:
   claude:
     model: sonnet
@@ -158,7 +158,7 @@ describe("loadProjectConfig", () => {
   });
 
   test("handles invalid YAML gracefully", async () => {
-    writeFileSync(join(testDir, "ma.config.yaml"), "invalid: yaml: content:");
+    writeFileSync(join(testDir, "mdflow.config.yaml"), "invalid: yaml: content:");
 
     const config = await loadProjectConfig(testDir);
     // Should return empty config on parse error
@@ -166,7 +166,7 @@ describe("loadProjectConfig", () => {
   });
 
   test("handles invalid JSON gracefully", async () => {
-    writeFileSync(join(testDir, ".markdown-agent.json"), "{ invalid json }");
+    writeFileSync(join(testDir, ".mdflow.json"), "{ invalid json }");
 
     const config = await loadProjectConfig(testDir);
     expect(config).toEqual({});
@@ -192,7 +192,7 @@ describe("loadFullConfig", () => {
 
   test("project config overrides global config", async () => {
     writeFileSync(
-      join(testDir, "ma.config.yaml"),
+      join(testDir, "mdflow.config.yaml"),
       `commands:
   copilot:
     $1: custom-prompt
@@ -205,7 +205,7 @@ describe("loadFullConfig", () => {
 
   test("project config adds new commands", async () => {
     writeFileSync(
-      join(testDir, "ma.config.yaml"),
+      join(testDir, "mdflow.config.yaml"),
       `commands:
   my-tool:
     $1: body
@@ -223,7 +223,7 @@ describe("loadFullConfig", () => {
 
   test("project config merges with existing command", async () => {
     writeFileSync(
-      join(testDir, "ma.config.yaml"),
+      join(testDir, "mdflow.config.yaml"),
       `commands:
   copilot:
     verbose: true
@@ -261,7 +261,7 @@ describe("config cascade", () => {
   test("CWD config overrides git root config", async () => {
     // Git root config
     writeFileSync(
-      join(gitRoot, "ma.config.yaml"),
+      join(gitRoot, "mdflow.config.yaml"),
       `commands:
   claude:
     model: sonnet
@@ -271,7 +271,7 @@ describe("config cascade", () => {
 
     // CWD config (subdirectory)
     writeFileSync(
-      join(subDir, "ma.config.yaml"),
+      join(subDir, "mdflow.config.yaml"),
       `commands:
   claude:
     model: opus
@@ -287,7 +287,7 @@ describe("config cascade", () => {
 
   test("git root config used when CWD has no config", async () => {
     writeFileSync(
-      join(gitRoot, "ma.config.yaml"),
+      join(gitRoot, "mdflow.config.yaml"),
       `commands:
   claude:
     model: sonnet
@@ -300,7 +300,7 @@ describe("config cascade", () => {
 
   test("only CWD config used when at git root", async () => {
     writeFileSync(
-      join(gitRoot, "ma.config.yaml"),
+      join(gitRoot, "mdflow.config.yaml"),
       `commands:
   claude:
     model: opus

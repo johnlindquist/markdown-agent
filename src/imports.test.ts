@@ -436,7 +436,7 @@ describe("isMarkdownFileCommand", () => {
 
   test("detects home path .md file", () => {
     expect(isMarkdownFileCommand("~/foo.md")).toBe(true);
-    expect(isMarkdownFileCommand("~/.ma/foo.md")).toBe(true);
+    expect(isMarkdownFileCommand("~/.mdflow/foo.md")).toBe(true);
   });
 
   test("detects absolute path .md file", () => {

@@ -61,7 +61,7 @@ Hello {{ required_var }}
     const stderr = result.stderr || "";
     expect(stderr).toContain("Missing template variables");
     expect(stderr).toContain("Detailed logs:");
-    expect(stderr).toContain(".markdown-agent/logs");
+    expect(stderr).toContain(".mdflow/logs");
   });
 
   test("shows log path on import error", () => {
@@ -85,7 +85,7 @@ Hello {{ required_var }}
 
   test("getAgentLogPath returns expected path format", () => {
     const path = getAgentLogPath("test.claude.md");
-    expect(path).toContain(".markdown-agent/logs");
+    expect(path).toContain(".mdflow/logs");
     expect(path).toContain("test-claude");
     expect(path).toContain("debug.log");
   });

@@ -297,7 +297,7 @@ After import`;
 
   it("config loading is fresh per context", async () => {
     // Create a project config
-    const configPath = join(tempDir, "ma.config.yaml");
+    const configPath = join(tempDir, "mdflow.config.yaml");
     await writeFile(
       configPath,
       `commands:
