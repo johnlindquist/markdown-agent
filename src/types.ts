@@ -170,3 +170,31 @@ export interface RunContextOptions {
   /** Custom working directory (defaults to process.cwd()) */
   cwd?: string;
 }
+
+/**
+ * Tool adapter interface for decoupling tool-specific logic
+ *
+ * Each adapter defines how a specific CLI tool (claude, copilot, gemini, etc.)
+ * should be configured and how to transform between print and interactive modes.
+ *
+ * Adding support for a new tool only requires creating a new adapter file.
+ */
+export interface ToolAdapter {
+  /** The tool name this adapter handles (e.g., "claude", "copilot") */
+  name: string;
+
+  /**
+   * Default configuration for print mode (non-interactive)
+   * These defaults are applied when no user config overrides them
+   */
+  getDefaults(): CommandDefaults;
+
+  /**
+   * Transform frontmatter for interactive mode
+   * Called when _interactive is enabled (via flag or .i. filename marker)
+   *
+   * @param frontmatter - The frontmatter after defaults are applied
+   * @returns Transformed frontmatter for interactive mode
+   */
+  applyInteractiveMode(frontmatter: AgentFrontmatter): AgentFrontmatter;
+}

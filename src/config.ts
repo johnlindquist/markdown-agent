@@ -13,6 +13,7 @@ import { join, dirname, resolve } from "path";
 import { existsSync, statSync } from "fs";
 import yaml from "js-yaml";
 import type { AgentFrontmatter, GlobalConfig, CommandDefaults, RunContext } from "./types";
+import { getAdapter, buildBuiltinDefaults } from "./adapters";
 
 // Re-export types for convenience
 export type { GlobalConfig, CommandDefaults } from "./types";
@@ -26,26 +27,18 @@ const PROJECT_CONFIG_NAMES = ["mdflow.config.yaml", ".mdflow.yaml", ".mdflow.jso
 /**
  * Built-in defaults (used when no config file exists)
  * All tools default to PRINT mode (non-interactive)
+ *
+ * Generated dynamically from registered tool adapters
  */
 export const BUILTIN_DEFAULTS: GlobalConfig = {
-  commands: {
-    copilot: {
-      $1: "prompt",       // Map body to --prompt for copilot (print mode)
-      silent: true,       // Output only the agent response (no stats)
-    },
-    claude: {
-      print: true,        // --print flag for non-interactive mode
-    },
-    codex: {
-      _subcommand: "exec",  // Use 'exec' subcommand for non-interactive mode
-    },
-    // gemini defaults to one-shot mode (no special flags needed)
-  },
+  commands: buildBuiltinDefaults(),
 };
 
 /**
  * Apply _interactive mode transformations to frontmatter
  * Converts print defaults to interactive mode per command
+ *
+ * Uses the tool adapter registry to delegate tool-specific transformations.
  *
  * @param frontmatter - The frontmatter after defaults are applied
  * @param command - The resolved command name
@@ -79,33 +72,9 @@ export function applyInteractiveMode(
   delete result._interactive;
   delete result._i;
 
-  switch (command) {
-    case "copilot":
-      // copilot: Change from --prompt to --interactive
-      result.$1 = "interactive";
-      break;
-
-    case "claude":
-      // claude: Remove --print flag (interactive is default without it)
-      delete result.print;
-      break;
-
-    case "codex":
-      // codex: Remove _subcommand (interactive is default without exec subcommand)
-      delete result._subcommand;
-      break;
-
-    case "gemini":
-      // gemini: Add --prompt-interactive flag
-      result.$1 = "prompt-interactive";
-      break;
-
-    default:
-      // Unknown command - just remove _interactive, no other changes
-      break;
-  }
-
-  return result;
+  // Delegate to the appropriate tool adapter for tool-specific transformations
+  const adapter = getAdapter(command);
+  return adapter.applyInteractiveMode(result);
 }
 
 let cachedGlobalConfig: GlobalConfig | null = null;
