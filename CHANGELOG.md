@@ -1,3 +1,10 @@
+# [2.20.0](https://github.com/johnlindquist/mdflow/compare/v2.19.1...v2.20.0) (2025-12-10)
+
+
+### Features
+
+* add GitHub Pages landing page for mdflow.dev ([bbad4cb](https://github.com/johnlindquist/mdflow/commit/bbad4cbea142b0d43aace5bc32361e672a2eedb3))
+
 ## [2.19.1](https://github.com/johnlindquist/mdflow/compare/v2.19.0...v2.19.1) (2025-12-09)
 
 
