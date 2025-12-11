@@ -1,3 +1,10 @@
+# [2.27.0](https://github.com/johnlindquist/mdflow/compare/v2.26.0...v2.27.0) (2025-12-11)
+
+
+### Features
+
+* add Ctrl+E shortcut to open files in $EDITOR from selector ([fdb5896](https://github.com/johnlindquist/mdflow/commit/fdb5896b48158b5926dd2875affc229630db2593))
+
 # [2.26.0](https://github.com/johnlindquist/mdflow/compare/v2.25.1...v2.26.0) (2025-12-11)
 
 
