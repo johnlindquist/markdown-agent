@@ -1,3 +1,10 @@
+# [2.23.0](https://github.com/johnlindquist/mdflow/compare/v2.22.0...v2.23.0) (2025-12-11)
+
+
+### Features
+
+* support positional args as template variables (_1, _2, etc.) ([f2c97a3](https://github.com/johnlindquist/mdflow/commit/f2c97a3e35eb5dfaea82dc0d5c34c68bb7c6d66f))
+
 # [2.22.0](https://github.com/johnlindquist/mdflow/compare/v2.21.1...v2.22.0) (2025-12-11)
 
 
