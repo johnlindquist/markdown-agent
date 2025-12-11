@@ -1,3 +1,10 @@
+# [2.22.0](https://github.com/johnlindquist/mdflow/compare/v2.21.1...v2.22.0) (2025-12-11)
+
+
+### Features
+
+* add multi-directory file resolution for agent files ([f4ba887](https://github.com/johnlindquist/mdflow/commit/f4ba88744d693bf82b7af54d08050ef6bdd48182))
+
 ## [2.21.1](https://github.com/johnlindquist/mdflow/compare/v2.21.0...v2.21.1) (2025-12-10)
 
 
