@@ -178,10 +178,11 @@ describe("stdin abstraction", () => {
       await writeFile(filePath, `---\n---\nBody content`);
 
       const { streams } = createTestStreams("piped input data");
+      const stdinContent = await readStdinFromStreams(streams);
 
       const runtime = createRuntime();
       const result = await runtime.run(filePath, {
-        streams,
+        stdinContent,
         dryRun: true,
       });
 
@@ -210,10 +211,11 @@ describe("stdin abstraction", () => {
       await writeFile(filePath, `---\n---\nBody only`);
 
       const { streams } = createTestStreams(null); // TTY mode
+      const stdinContent = await readStdinFromStreams(streams);
 
       const runtime = createRuntime();
       const result = await runtime.run(filePath, {
-        streams,
+        stdinContent,
         dryRun: true,
       });
 
@@ -313,10 +315,11 @@ model: test-model
 Analyze the input`);
 
     const { streams } = createTestStreams("data to analyze");
+    const stdinContent = await readStdinFromStreams(streams);
 
     const runtime = createRuntime();
     const result = await runtime.run(filePath, {
-      streams,
+      stdinContent,
       dryRun: true,
     });
 
@@ -330,10 +333,11 @@ Analyze the input`);
 
     // Empty string stdin should be trimmed to empty
     const { streams } = createTestStreams("");
+    const stdinContent = await readStdinFromStreams(streams);
 
     const runtime = createRuntime();
     const result = await runtime.run(filePath, {
-      streams,
+      stdinContent,
       dryRun: true,
     });
 

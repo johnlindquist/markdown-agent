@@ -81,8 +81,8 @@ describe("RunContext", () => {
       ctx.logger.debug({ data: "test" }, "debug message");
 
       expect(ctx.logger.messages.length).toBe(2);
-      expect(ctx.logger.messages[0].msg).toBe("test message");
-      expect(ctx.logger.messages[1].obj).toEqual({ data: "test" });
+      expect(ctx.logger.messages[0]!.msg).toBe("test message");
+      expect(ctx.logger.messages[1]!.obj).toEqual({ data: "test" });
     });
 
     it("can clear messages", () => {
@@ -242,8 +242,8 @@ describe("RunContext Isolation", () => {
 
     expect(ctx1.logger.messages.length).toBe(1);
     expect(ctx2.logger.messages.length).toBe(1);
-    expect(ctx1.logger.messages[0].msg).toBe("from ctx1");
-    expect(ctx2.logger.messages[0].msg).toBe("from ctx2");
+    expect(ctx1.logger.messages[0]!.msg).toBe("from ctx1");
+    expect(ctx2.logger.messages[0]!.msg).toBe("from ctx2");
   });
 
   it("modifying one context does not affect another", async () => {

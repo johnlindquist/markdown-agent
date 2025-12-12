@@ -299,8 +299,8 @@ export class BunSystemEnvironment implements SystemEnvironment {
 
       return {
         exited: proc.exited,
-        stdout: proc.stdout,
-        stderr: proc.stderr,
+        stdout: proc.stdout ?? null,
+        stderr: proc.stderr ?? null,
         kill: (signal?: string) => proc.kill(signal as NodeJS.Signals),
         _process: proc,
       };
@@ -463,7 +463,7 @@ export class InMemorySystemEnvironment implements SystemEnvironment {
       return new TextEncoder().encode(file.content).length;
     },
 
-    glob: async function* (
+    glob: async function* (this: InMemorySystemEnvironment,
       pattern: string,
       options: { cwd: string; absolute: boolean; onlyFiles: boolean }
     ): AsyncIterable<string> {

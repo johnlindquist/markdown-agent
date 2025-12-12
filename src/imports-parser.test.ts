@@ -53,17 +53,17 @@ describe('parseImports', () => {
     it('parses file import with surrounding text', () => {
       const actions = parseImports('Before @./file.md After');
       expect(actions).toHaveLength(1);
-      expect(actions[0].type).toBe('file');
+      expect(actions[0]!.type).toBe('file');
       expect((actions[0] as any).path).toBe('./file.md');
-      expect(actions[0].index).toBe(7);
+      expect(actions[0]!.index).toBe(7);
     });
 
     it('parses multiple file imports', () => {
       const actions = parseImports('@./first.md and @./second.md');
       expect(actions).toHaveLength(2);
-      expect(actions[0].type).toBe('file');
+      expect(actions[0]!.type).toBe('file');
       expect((actions[0] as any).path).toBe('./first.md');
-      expect(actions[1].type).toBe('file');
+      expect(actions[1]!.type).toBe('file');
       expect((actions[1] as any).path).toBe('./second.md');
     });
 
@@ -200,13 +200,13 @@ describe('parseImports', () => {
     it('parses question mark glob', () => {
       const actions = parseImports('@./file?.ts');
       expect(actions).toHaveLength(1);
-      expect(actions[0].type).toBe('glob');
+      expect(actions[0]!.type).toBe('glob');
     });
 
     it('parses bracket glob', () => {
       const actions = parseImports('@./test/[abc].ts');
       expect(actions).toHaveLength(1);
-      expect(actions[0].type).toBe('glob');
+      expect(actions[0]!.type).toBe('glob');
     });
 
     it('parses complex glob patterns', () => {
@@ -218,8 +218,8 @@ describe('parseImports', () => {
     it('parses multiple glob imports', () => {
       const actions = parseImports('@./src/*.ts @./lib/*.js');
       expect(actions).toHaveLength(2);
-      expect(actions[0].type).toBe('glob');
-      expect(actions[1].type).toBe('glob');
+      expect(actions[0]!.type).toBe('glob');
+      expect(actions[1]!.type).toBe('glob');
     });
   });
 
@@ -263,7 +263,7 @@ describe('parseImports', () => {
     it('distinguishes URL imports from email addresses', () => {
       const actions = parseImports('email: user@example.com url: @https://example.com');
       expect(actions).toHaveLength(1);
-      expect(actions[0].type).toBe('url');
+      expect(actions[0]!.type).toBe('url');
     });
   });
 
@@ -315,9 +315,9 @@ describe('parseImports', () => {
       const content = '@./file.md @https://example.com !`echo test`';
       const actions = parseImports(content);
       expect(actions).toHaveLength(3);
-      expect(actions[0].type).toBe('file');
-      expect(actions[1].type).toBe('url');
-      expect(actions[2].type).toBe('command');
+      expect(actions[0]!.type).toBe('file');
+      expect(actions[1]!.type).toBe('url');
+      expect(actions[2]!.type).toBe('command');
     });
 
     it('maintains correct order by index', () => {
@@ -325,9 +325,9 @@ describe('parseImports', () => {
       const actions = parseImports(content);
       expect(actions).toHaveLength(3);
       // Should be in order of appearance
-      expect(actions[0].type).toBe('command');
-      expect(actions[1].type).toBe('file');
-      expect(actions[2].type).toBe('url');
+      expect(actions[0]!.type).toBe('command');
+      expect(actions[1]!.type).toBe('file');
+      expect(actions[2]!.type).toBe('url');
     });
 
     it('handles imports on multiple lines', () => {
@@ -356,13 +356,13 @@ describe('parseImports', () => {
 
     it('handles imports at very start of string', () => {
       const actions = parseImports('@./file.md');
-      expect(actions[0].index).toBe(0);
+      expect(actions[0]!.index).toBe(0);
     });
 
     it('handles imports at end of string', () => {
       const content = 'text @./file.md';
       const actions = parseImports(content);
-      expect(actions[0].index).toBe(5);
+      expect(actions[0]!.index).toBe(5);
     });
 
     it('handles consecutive imports without space', () => {
@@ -666,7 +666,7 @@ describe('findSafeRanges', () => {
     const ranges = findSafeRanges(content);
     expect(ranges).toHaveLength(2);
     expect(ranges[0]).toEqual({ start: 0, end: 7 }); // 'before\n'
-    expect(ranges[1].start).toBeGreaterThan(ranges[0].end);
+    expect(ranges[1]!.start).toBeGreaterThan(ranges[0]!.end);
   });
 
   it('splits around inline code', () => {
@@ -675,8 +675,8 @@ describe('findSafeRanges', () => {
     expect(ranges).toHaveLength(2);
     expect(ranges[0]).toEqual({ start: 0, end: 7 }); // 'before '
     // After the closing backtick
-    expect(ranges[1].start).toBe(13); // position after '`code`'
-    expect(ranges[1].end).toBe(content.length);
+    expect(ranges[1]!.start).toBe(13); // position after '`code`'
+    expect(ranges[1]!.end).toBe(content.length);
   });
 
   it('handles multiple inline code spans', () => {
@@ -720,7 +720,7 @@ describe('findSafeRanges', () => {
     const content = '`code` after';
     const ranges = findSafeRanges(content);
     expect(ranges).toHaveLength(1);
-    expect(ranges[0].start).toBe(6); // after '`code`'
+    expect(ranges[0]!.start).toBe(6); // after '`code`'
   });
 
   it('handles inline code at end', () => {

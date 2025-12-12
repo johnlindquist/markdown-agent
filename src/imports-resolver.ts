@@ -63,7 +63,7 @@ function extractSymbol(content: string, symbolName: string): string {
   let foundDeclaration = false;
 
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
+    const line = (lines[i] ?? '').trim();
 
     // Check if this line starts the symbol we're looking for
     if (startLine === -1) {
@@ -77,10 +77,11 @@ function extractSymbol(content: string, symbolName: string): string {
     }
 
     if (startLine !== -1) {
+      const currentLineStr = lines[i] ?? '';
       // Count braces/parens to find the end of the declaration
-      for (let j = 0; j < lines[i].length; j++) {
-        const char = lines[i][j];
-        const prevChar = j > 0 ? lines[i][j - 1] : '';
+      for (let j = 0; j < currentLineStr.length; j++) {
+        const char = currentLineStr[j];
+        const prevChar = j > 0 ? currentLineStr[j - 1] : '';
 
         // Handle string literals
         if (!inString && (char === '"' || char === "'" || char === '`')) {
@@ -101,11 +102,12 @@ function extractSymbol(content: string, symbolName: string): string {
       // Check if we've closed all braces (for block declarations)
       if (foundDeclaration && braceDepth === 0 && parenDepth === 0) {
         // For type aliases, we need to check for semicolon or end of statement
-        const currentLine = lines[i].trim();
+        const currentLineTrimmed = (lines[i] ?? '').trim();
+        const nextLine = lines[i + 1];
         if (
-          currentLine.endsWith(';') ||
-          currentLine.endsWith('}') ||
-          (i + 1 < lines.length && !lines[i + 1].trim().startsWith('.'))
+          currentLineTrimmed.endsWith(';') ||
+          currentLineTrimmed.endsWith('}') ||
+          (i + 1 < lines.length && nextLine && !nextLine.trim().startsWith('.'))
         ) {
           return lines.slice(startLine, i + 1).join('\n');
         }
@@ -139,7 +141,7 @@ const ALLOWED_CONTENT_TYPES = [
 function isAllowedContentType(contentType: string | null): boolean {
   if (!contentType) return false;
   // Extract the base type (ignore charset and other params)
-  const baseType = contentType.split(';')[0].trim().toLowerCase();
+  const baseType = (contentType.split(';')[0] ?? '').trim().toLowerCase();
   return ALLOWED_CONTENT_TYPES.includes(baseType);
 }
 

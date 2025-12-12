@@ -280,6 +280,7 @@ export async function runCommand(ctx: RunContext): Promise<RunResult> {
   for (let i = 0; i < positionals.length; i++) {
     const pos = i + 1; // $1 is first positional
     const value = positionals[i];
+    if (value === undefined) continue;
 
     if (positionalMappings.has(pos)) {
       // Map to flag: $1: prompt → --prompt <value>

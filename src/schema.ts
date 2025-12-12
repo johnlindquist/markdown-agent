@@ -28,9 +28,9 @@ export type FrontmatterSchema = z.infer<typeof frontmatterSchema>;
 /**
  * Format zod issues into readable error strings
  */
-function formatZodIssues(issues: Array<{ path: (string | number)[]; message: string }>): string[] {
+function formatZodIssues(issues: Array<{ path: PropertyKey[]; message: string }>): string[] {
   return issues.map(issue => {
-    const path = issue.path.join(".");
+    const path = issue.path.map(String).join(".");
     return path ? `${path}: ${issue.message}` : issue.message;
   });
 }

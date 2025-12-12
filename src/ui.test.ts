@@ -1,11 +1,13 @@
 import { expect, test, describe, beforeEach, afterEach } from "bun:test";
-import {
+import type {
   UserInterface,
-  ConsoleUI,
-  TestUI,
   TestUIConfig,
   Choice,
   RecordedPrompt,
+} from "./ui";
+import {
+  ConsoleUI,
+  TestUI,
   getUI,
   setUI,
   resetUI,
@@ -129,10 +131,10 @@ describe("TestUI", () => {
 
       const prompts = ui.getPrompts();
       expect(prompts.length).toBe(1);
-      expect(prompts[0].type).toBe("select");
-      expect(prompts[0].message).toBe("Pick one:");
-      expect(prompts[0].choices).toEqual(choices);
-      expect(prompts[0].response).toBe("b");
+      expect(prompts[0]!.type).toBe("select");
+      expect(prompts[0]!.message).toBe("Pick one:");
+      expect(prompts[0]!.choices).toEqual(choices);
+      expect(prompts[0]!.response).toBe("b");
     });
   });
 
@@ -351,10 +353,10 @@ describe("trust flow simulation", () => {
     // Verify prompts were recorded correctly
     const prompts = ui.getPrompts();
     expect(prompts.length).toBe(2);
-    expect(prompts[0].type).toBe("confirm");
-    expect(prompts[0].message).toContain("Execute");
-    expect(prompts[1].type).toBe("select");
-    expect(prompts[1].message).toContain("Trust");
+    expect(prompts[0]!.type).toBe("confirm");
+    expect(prompts[0]!.message).toContain("Execute");
+    expect(prompts[1]!.type).toBe("select");
+    expect(prompts[1]!.message).toContain("Trust");
   });
 
   test("auto-reject trust flow", async () => {
@@ -369,7 +371,7 @@ describe("trust flow simulation", () => {
     // Should not prompt for trust since execution was rejected
     const prompts = ui.getPrompts();
     expect(prompts.length).toBe(1);
-    expect(prompts[0].response).toBe(false);
+    expect(prompts[0]!.response).toBe(false);
   });
 
   test("approve execution but decline trust", async () => {
@@ -417,8 +419,8 @@ describe("interactive variable input simulation", () => {
 
     const prompts = ui.getPrompts();
     expect(prompts.length).toBe(2);
-    expect(prompts[0].message).toBe("name:");
-    expect(prompts[1].message).toBe("task:");
+    expect(prompts[0]!.message).toBe("name:");
+    expect(prompts[1]!.message).toBe("task:");
   });
 
   test("uses default values for unmatched inputs", async () => {
@@ -506,13 +508,13 @@ describe("prompt message verification", () => {
     const prompts = ui.getPrompts();
 
     // Verify confirm prompt
-    expect(prompts[0].message).toBe(`Execute this remote agent from ${domain}?`);
-    expect(prompts[0].defaultValue).toBe(false);
+    expect(prompts[0]!.message).toBe(`Execute this remote agent from ${domain}?`);
+    expect(prompts[0]!.defaultValue).toBe(false);
 
     // Verify select prompt
-    expect(prompts[1].message).toBe(`Trust ${domain} for future executions?`);
-    expect(prompts[1].choices).toBeDefined();
-    expect(prompts[1].choices?.length).toBe(2);
-    expect(prompts[1].choices?.[1].name).toContain(domain);
+    expect(prompts[1]!.message).toBe(`Trust ${domain} for future executions?`);
+    expect(prompts[1]!.choices).toBeDefined();
+    expect(prompts[1]!.choices?.length).toBe(2);
+    expect(prompts[1]!.choices?.[1]!.name).toContain(domain);
   });
 });

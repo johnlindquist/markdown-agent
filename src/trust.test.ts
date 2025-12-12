@@ -46,7 +46,6 @@ describe("known hosts file operations", () => {
 
   beforeEach(async () => {
     // Create temp directory for testing
-    tempDir = await Bun.file(join(tmpdir(), `trust-test-${Date.now()}`)).name;
     tempDir = join(tmpdir(), `trust-test-${Date.now()}`);
     await mkdir(tempDir, { recursive: true });
     await mkdir(join(tempDir, ".mdflow"), { recursive: true });

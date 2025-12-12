@@ -28,6 +28,7 @@ function parseCreateArgs(args: string[]): CreateOptions {
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
+    if (!arg) continue;
 
     // Handle positional arg as name if it's the first arg and not a flag
     if (i === 0 && !arg.startsWith("-")) {
@@ -43,7 +44,7 @@ function parseCreateArgs(args: string[]): CreateOptions {
     } else if (arg === "--_command" || arg === "-_c") {
       options.command = args[++i];
     } else if (arg === "--location" || arg === "-l") {
-      const loc = args[++i];
+      const loc = args[++i] ?? "";
       if (["cwd", "project", "user"].includes(loc)) {
         options.location = loc as "cwd" | "project" | "user";
       }

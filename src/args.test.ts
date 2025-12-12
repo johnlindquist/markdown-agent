@@ -26,8 +26,10 @@ Say: {{ message }}`;
     // Consume positional args (same logic as index.ts)
     if (frontmatter.args && Array.isArray(frontmatter.args)) {
       for (let i = 0; i < frontmatter.args.length; i++) {
-        if (i < cliArgs.length) {
-          templateVars[frontmatter.args[i]] = cliArgs[i];
+        const argName = frontmatter.args[i];
+        const cliValue = cliArgs[i];
+        if (i < cliArgs.length && argName && cliValue !== undefined) {
+          templateVars[argName] = cliValue;
         }
       }
     }
@@ -53,8 +55,10 @@ args: [name, action]
 
     if (frontmatter.args && Array.isArray(frontmatter.args)) {
       for (let i = 0; i < frontmatter.args.length; i++) {
-        if (i < cliArgs.length) {
-          templateVars[frontmatter.args[i]] = cliArgs[i];
+        const argName = frontmatter.args[i];
+        const cliValue = cliArgs[i];
+        if (i < cliArgs.length && argName && cliValue !== undefined) {
+          templateVars[argName] = cliValue;
         }
       }
     }
@@ -79,8 +83,10 @@ args: [prompt]
 
     if (frontmatter.args && Array.isArray(frontmatter.args)) {
       for (let i = 0; i < frontmatter.args.length; i++) {
-        if (i < cliArgs.length) {
-          templateVars[frontmatter.args[i]] = cliArgs[i];
+        const argName = frontmatter.args[i];
+        const cliValue = cliArgs[i];
+        if (i < cliArgs.length && argName && cliValue !== undefined) {
+          templateVars[argName] = cliValue;
         }
       }
     }
@@ -156,8 +162,9 @@ Build {{ feature_name }}`;
 
       // Look for --varname in CLI args
       const flagIndex = cliArgs.findIndex(arg => arg === `--${varName}`);
-      if (flagIndex !== -1 && flagIndex + 1 < cliArgs.length) {
-        templateVars[varName] = cliArgs[flagIndex + 1];
+      const flagValue = flagIndex !== -1 ? cliArgs[flagIndex + 1] : undefined;
+      if (flagValue !== undefined) {
+        templateVars[varName] = flagValue;
       } else if (defaultValue !== undefined && defaultValue !== null && defaultValue !== "") {
         templateVars[varName] = String(defaultValue);
       }

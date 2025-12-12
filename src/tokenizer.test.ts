@@ -70,7 +70,7 @@ describe("tokenizer", () => {
 
   describe("getContextLimit", () => {
     it("returns default limit when no model specified", () => {
-      expect(getContextLimit()).toBe(MODEL_CONTEXT_LIMITS.default);
+      expect(getContextLimit()).toBe(MODEL_CONTEXT_LIMITS.default ?? 100000);
     });
 
     it("returns correct limit for Claude models", () => {
@@ -108,8 +108,8 @@ describe("tokenizer", () => {
     });
 
     it("returns default for unknown models", () => {
-      expect(getContextLimit("unknown-model")).toBe(MODEL_CONTEXT_LIMITS.default);
-      expect(getContextLimit("my-custom-llm")).toBe(MODEL_CONTEXT_LIMITS.default);
+      expect(getContextLimit("unknown-model")).toBe(MODEL_CONTEXT_LIMITS.default ?? 100000);
+      expect(getContextLimit("my-custom-llm")).toBe(MODEL_CONTEXT_LIMITS.default ?? 100000);
     });
 
     it("uses config override when provided", () => {

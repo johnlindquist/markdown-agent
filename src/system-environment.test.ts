@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import {
+import type {
   SystemEnvironment,
+} from "./system-environment";
+import {
   BunSystemEnvironment,
   InMemorySystemEnvironment,
   createTestEnvironment,
@@ -163,7 +165,7 @@ describe("SystemEnvironment Interface", () => {
         );
 
         expect(response.ok).toBe(true);
-        const data = await response.json();
+        const data = (await response.json()) as { id: number };
         expect(data.id).toBe(1);
       });
     });
@@ -336,8 +338,8 @@ describe("SystemEnvironment Interface", () => {
         await env.shell.execute("test", ["arg1", "arg2"]);
 
         expect(env.executedCommands).toHaveLength(1);
-        expect(env.executedCommands[0].cmd).toBe("test");
-        expect(env.executedCommands[0].args).toEqual(["arg1", "arg2"]);
+        expect(env.executedCommands[0]!.cmd).toBe("test");
+        expect(env.executedCommands[0]!.args).toEqual(["arg1", "arg2"]);
       });
 
       it("executeSync works with mocks", () => {
@@ -390,7 +392,7 @@ describe("SystemEnvironment Interface", () => {
         const response = await env.network.fetch("https://api.example.com/data");
 
         expect(response.status).toBe(200);
-        const data = await response.json();
+        const data = (await response.json()) as { key: string };
         expect(data.key).toBe("value");
       });
 
@@ -409,8 +411,8 @@ describe("SystemEnvironment Interface", () => {
         });
 
         expect(env.fetchedUrls).toHaveLength(1);
-        expect(env.fetchedUrls[0].url).toBe("https://track.me");
-        expect(env.fetchedUrls[0].options?.method).toBe("POST");
+        expect(env.fetchedUrls[0]!.url).toBe("https://track.me");
+        expect(env.fetchedUrls[0]!.options?.method).toBe("POST");
       });
     });
 
@@ -523,7 +525,7 @@ describe("SystemEnvironment Interface", () => {
 
       // Make request
       const response = await env.network.fetch("https://api.github.com/user");
-      const user = await response.json();
+      const user = (await response.json()) as { login: string };
 
       expect(user.login).toBe("testuser");
     });
@@ -554,7 +556,7 @@ describe("SystemEnvironment Interface", () => {
       const registryResponse = await env.network.fetch(
         `https://registry.npmjs.org/${pkg.name}`
       );
-      const registryData = await registryResponse.json();
+      const registryData = (await registryResponse.json()) as { name: string; version: string };
 
       const installResult = await env.shell.execute("npm", ["install"]);
 

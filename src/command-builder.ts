@@ -183,6 +183,7 @@ export function applyPositionalArgs(
   for (let i = 0; i < positionals.length; i++) {
     const pos = i + 1; // $1 is first positional
     const value = positionals[i];
+    if (value === undefined) continue;
 
     if (mappings.has(pos)) {
       // Map to flag: $1: prompt -> --prompt <value>
@@ -246,7 +247,7 @@ export function buildCommand(
 ): CommandSpec {
   // Apply command defaults from config
   const defaults = getCommandDefaultsFromConfig(command, config);
-  const mergedFrontmatter: AgentFrontmatter = { ...defaults, ...frontmatter };
+  const mergedFrontmatter = { ...defaults, ...frontmatter } as AgentFrontmatter;
 
   // Build base args from frontmatter
   const baseArgs = buildArgsFromFrontmatter(mergedFrontmatter, templateVars);
@@ -296,7 +297,7 @@ export function buildCommandBase(
 ): CommandSpec {
   // Apply command defaults from config
   const defaults = getCommandDefaultsFromConfig(command, config);
-  const mergedFrontmatter: AgentFrontmatter = { ...defaults, ...frontmatter };
+  const mergedFrontmatter = { ...defaults, ...frontmatter } as AgentFrontmatter;
 
   // Build base args from frontmatter
   const args = buildArgsFromFrontmatter(mergedFrontmatter, templateVars);

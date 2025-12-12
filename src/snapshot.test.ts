@@ -207,7 +207,7 @@ describe("URL imports (mocked)", () => {
       }
 
       return new Response("Not Found", { status: 404 });
-    }) as typeof fetch;
+    }) as unknown as typeof fetch;
   });
 
   afterAll(() => {

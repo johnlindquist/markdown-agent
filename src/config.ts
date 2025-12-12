@@ -278,7 +278,7 @@ export function applyDefaults(
   }
 
   // Defaults go first, frontmatter overrides
-  const result: AgentFrontmatter = { ...defaults };
+  const result = { ...defaults } as AgentFrontmatter;
 
   for (const [key, value] of Object.entries(frontmatter)) {
     result[key] = value;

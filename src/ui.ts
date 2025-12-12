@@ -178,7 +178,7 @@ export class TestUI implements UserInterface {
       response = match?.value ?? choices[0]?.value ?? defaultValue as T;
     } else {
       // Use default or first choice
-      response = defaultValue ?? choices[0]?.value;
+      response = defaultValue ?? choices[0]?.value!;
     }
 
     this.prompts.push({

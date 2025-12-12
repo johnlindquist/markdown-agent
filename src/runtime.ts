@@ -273,7 +273,8 @@ export class AgentRuntime {
     }
 
     // Run pre/before lifecycle hook
-    const preCommand = frontmatter.pre || frontmatter.before;
+    const preCommandRaw = frontmatter.pre || frontmatter.before;
+    const preCommand = typeof preCommandRaw === 'string' ? preCommandRaw : undefined;
     let preHookOutput: string | undefined;
 
     if (preCommand) {
@@ -288,7 +289,8 @@ export class AgentRuntime {
     }
 
     // Capture post/after hook command for later execution
-    const postHookCommand = frontmatter.post || frontmatter.after;
+    const postHookRaw = frontmatter.post || frontmatter.after;
+    const postHookCommand = typeof postHookRaw === 'string' ? postHookRaw : undefined;
 
     return {
       frontmatter,
@@ -336,8 +338,9 @@ export class AgentRuntime {
       const flag = `--${key}`;
       const flagIndex = remainingArgs.findIndex(arg => arg === flag);
 
-      if (flagIndex !== -1 && flagIndex + 1 < remainingArgs.length) {
-        templateVars[key] = remainingArgs[flagIndex + 1];
+      const flagValue = remainingArgs[flagIndex + 1];
+      if (flagIndex !== -1 && flagIndex + 1 < remainingArgs.length && flagValue !== undefined) {
+        templateVars[key] = flagValue;
         // Consume both flag and value
         remainingArgs.splice(flagIndex, 2);
       } else if (defaultValue !== undefined && defaultValue !== null && defaultValue !== "") {

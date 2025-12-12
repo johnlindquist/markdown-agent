@@ -71,8 +71,8 @@ describe("findAgentFiles", () => {
     // Filter to only PATH files (ignoring ~/.mdflow files that may exist)
     const pathFiles = files.filter(f => f.source === pathDir);
     expect(pathFiles.length).toBe(1);
-    expect(pathFiles[0].name).toBe("global-agent.md");
-    expect(pathFiles[0].source).toBe(pathDir);
+    expect(pathFiles[0]!.name).toBe("global-agent.md");
+    expect(pathFiles[0]!.source).toBe(pathDir);
   });
 
   test("deduplicates files that appear in both cwd and PATH", async () => {
@@ -89,8 +89,8 @@ describe("findAgentFiles", () => {
 
     // Should only appear once (from cwd, since we scan that first)
     expect(relevantFiles.length).toBe(1);
-    expect(relevantFiles[0].name).toBe("shared-agent.md");
-    expect(relevantFiles[0].source).toBe("cwd");
+    expect(relevantFiles[0]!.name).toBe("shared-agent.md");
+    expect(relevantFiles[0]!.source).toBe("cwd");
   });
 
   test("returns empty array when no .md files exist in cwd or PATH", async () => {
@@ -172,7 +172,7 @@ describe("findAgentFiles", () => {
     // Filter to only cwd files (ignoring ~/.mdflow files)
     const cwdFiles = files.filter(f => f.source === "cwd");
     expect(cwdFiles.length).toBe(1);
-    expect(cwdFiles[0].name).toBe("agent.md");
+    expect(cwdFiles[0]!.name).toBe("agent.md");
   });
 });
 

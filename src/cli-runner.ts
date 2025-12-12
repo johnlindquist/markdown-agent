@@ -8,6 +8,7 @@
 
 import { parseFrontmatter } from "./parse";
 import { parseCliArgs, handleMaCommands } from "./cli";
+import type { AgentFrontmatter } from "./types";
 import { substituteTemplateVars, extractTemplateVars } from "./template";
 import { isRemoteUrl, fetchRemote, cleanupRemote } from "./remote";
 import {
@@ -345,7 +346,7 @@ export class CliRunner {
 
     await loadGlobalConfig();
     const commandDefaults = await getCommandDefaults(command);
-    let frontmatter = applyDefaults(baseFrontmatter, commandDefaults);
+    let frontmatter = applyDefaults(baseFrontmatter as AgentFrontmatter, commandDefaults);
     const interactiveFromFilename = hasInteractiveMarker(localFilePath);
     frontmatter = applyInteractiveMode(frontmatter, command, interactiveFromFilename || interactiveFromCli);
 
@@ -369,8 +370,9 @@ export class CliRunner {
       // CLI flag matches the full key including underscore: --_name
       const flag = `--${key}`;
       const idx = remaining.findIndex((a) => a === flag);
-      if (idx !== -1 && idx + 1 < remaining.length) {
-        templateVars[key] = remaining[idx + 1];
+      const flagValue = idx !== -1 && idx + 1 < remaining.length ? remaining[idx + 1] : undefined;
+      if (flagValue !== undefined) {
+        templateVars[key] = flagValue;
         remaining.splice(idx, 2);
       } else if (defaultValue != null && defaultValue !== "") {
         templateVars[key] = String(defaultValue);
@@ -382,6 +384,7 @@ export class CliRunner {
     // Supports both --_key value and --_key=value syntax
     for (let i = remaining.length - 1; i >= 0; i--) {
       const arg = remaining[i];
+      if (!arg) continue;
       // Check for --_key=value syntax
       if (arg.startsWith("--_") && arg.includes("=")) {
         const eqIndex = arg.indexOf("=");
@@ -392,8 +395,9 @@ export class CliRunner {
         }
       } else if (arg.startsWith("--_") && !internalKeys.has(arg.slice(2))) {
         const key = arg.slice(2); // Remove --
-        if (i + 1 < remaining.length && !remaining[i + 1].startsWith("-")) {
-          templateVars[key] = remaining[i + 1];
+        const nextArg = remaining[i + 1];
+        if (i + 1 < remaining.length && nextArg && !nextArg.startsWith("-")) {
+          templateVars[key] = nextArg;
           remaining.splice(i, 2);
         } else {
           // Boolean flag without value
@@ -409,11 +413,14 @@ export class CliRunner {
     const flagArgs: string[] = [];
     for (let i = 0; i < remaining.length; i++) {
       const arg = remaining[i];
+      if (!arg) continue;
       if (arg.startsWith("-")) {
         // It's a flag - include it and its value if present
         flagArgs.push(arg);
-        if (i + 1 < remaining.length && !remaining[i + 1].startsWith("-")) {
-          flagArgs.push(remaining[++i]);
+        const nextArg = remaining[i + 1];
+        if (i + 1 < remaining.length && nextArg && !nextArg.startsWith("-")) {
+          flagArgs.push(nextArg);
+          i++;
         }
       } else {
         // It's a positional arg
@@ -423,7 +430,8 @@ export class CliRunner {
     // Inject positional args as _1, _2, etc. template variables
     // Uses underscore prefix to match other template var conventions
     for (let i = 0; i < positionalCliArgs.length; i++) {
-      templateVars[`_${i + 1}`] = positionalCliArgs[i];
+      const posArg = positionalCliArgs[i];
+      if (posArg) templateVars[`_${i + 1}`] = posArg;
     }
     // Inject _args as all positional args formatted as a numbered list
     if (positionalCliArgs.length > 0) {
@@ -492,12 +500,13 @@ export class CliRunner {
 
     let dryRunArgs = [...args];
     if (frontmatter._subcommand) {
-      const subs = Array.isArray(frontmatter._subcommand) ? frontmatter._subcommand : [frontmatter._subcommand];
+      const subCmd = frontmatter._subcommand;
+      const subs = Array.isArray(subCmd) ? subCmd.map(String) : [String(subCmd)];
       dryRunArgs = [...subs, ...dryRunArgs];
     }
 
     for (let i = 0; i < positionals.length; i++) {
-      const pos = i + 1, value = positionals[i];
+      const pos = i + 1, value = positionals[i] ?? "";
       if (positionalMappings.has(pos)) {
         const flagName = positionalMappings.get(pos)!;
         dryRunArgs.push(flagName.length === 1 ? `-${flagName}` : `--${flagName}`, `"${value.replace(/"/g, '\\"')}"`);
@@ -510,9 +519,9 @@ export class CliRunner {
     this.writeStdout(`   ${command} ${dryRunArgs.join(" ")}\n`);
     this.writeStdout("Final Prompt:");
     this.writeStdout("───────────────────────────────────────────────────────────");
-    this.writeStdout(positionals[0]);
+    this.writeStdout(positionals[0] ?? "");
     this.writeStdout("───────────────────────────────────────────────────────────\n");
-    this.writeStdout(`Estimated tokens: ~${countTokens(positionals[0]).toLocaleString()}`);
+    this.writeStdout(`Estimated tokens: ~${countTokens(positionals[0] ?? "").toLocaleString()}`);
 
     if (isRemote) await cleanupRemote(localFilePath);
     logger.info({ dryRun: true }, "Dry run completed");
@@ -532,7 +541,7 @@ export class CliRunner {
         throw new SecurityError(`Untrusted remote domain: ${domain}. Use --_trust flag to bypass this check in non-interactive mode, or run interactively to add the domain to known_hosts.`);
       }
 
-      const trustResult = await promptForTrust(filePath, command, baseFrontmatter, rawBody);
+      const trustResult = await promptForTrust(filePath, command, baseFrontmatter as AgentFrontmatter, rawBody);
       if (!trustResult.approved) {
         await cleanupRemote(localFilePath);
         throw new UserCancelledError("Execution cancelled by user");

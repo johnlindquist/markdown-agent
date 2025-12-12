@@ -118,7 +118,7 @@ describe("findAgentFiles", () => {
   test("returns files with correct structure", async () => {
     const files = await findAgentFiles();
     if (files.length > 0) {
-      const file = files[0];
+      const file = files[0]!;
       expect(file).toHaveProperty("name");
       expect(file).toHaveProperty("path");
       expect(file).toHaveProperty("source");

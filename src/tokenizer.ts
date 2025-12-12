@@ -84,7 +84,7 @@ export function getContextLimit(
   }
 
   if (!model) {
-    return MODEL_CONTEXT_LIMITS.default;
+    return MODEL_CONTEXT_LIMITS.default ?? 100000;
   }
 
   const normalizedModel = model.toLowerCase();
@@ -108,7 +108,7 @@ export function getContextLimit(
     }
   }
 
-  return MODEL_CONTEXT_LIMITS.default;
+  return MODEL_CONTEXT_LIMITS.default ?? 100000;
 }
 
 /**

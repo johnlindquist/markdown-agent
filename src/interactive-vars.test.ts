@@ -69,8 +69,8 @@ describe("interactive variable recovery", () => {
       // Mock what the interactive loop does
       const mockInputValues = ["Alice", "write tests"];
       for (let i = 0; i < missingVars.length; i++) {
-        const v = missingVars[i];
-        templateVars[v] = mockInputValues[i];
+        const v = missingVars[i]!;
+        templateVars[v] = mockInputValues[i]!;
       }
 
       expect(templateVars).toEqual({

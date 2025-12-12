@@ -136,11 +136,13 @@ function isInSafeRange(index: number, safeRanges: Array<{ start: number; end: nu
 const FILE_IMPORT_PATTERN = /@(~?[./][^\s]+)/g;
 
 /**
- * Pattern to match !`command` inlines
- * Matches: !`any command here`
- * Supports multi-word commands inside backticks
+ * Pattern to match !`command` inlines with balanced backticks
+ * Matches: !`any command here`, !``cmd with `backticks` ``
+ * Supports commands containing backticks by using variable-length delimiters.
+ * Capture group 1: The backtick delimiter (` or `` or ```)
+ * Capture group 2: The command content
  */
-const COMMAND_INLINE_PATTERN = /!`([^`]+)`/g;
+const COMMAND_INLINE_PATTERN = /!(`+)([\s\S]+?)\1/g;
 
 /**
  * Pattern to match @url imports
@@ -162,7 +164,7 @@ export function isGlobPattern(path: string): boolean {
  */
 export function parseLineRange(path: string): { path: string; start?: number; end?: number } {
   const match = path.match(/^(.+):(\d+)-(\d+)$/);
-  if (match) {
+  if (match && match[1] && match[2] && match[3]) {
     return {
       path: match[1],
       start: parseInt(match[2], 10),
@@ -177,7 +179,7 @@ export function parseLineRange(path: string): { path: string; start?: number; en
  */
 export function parseSymbolExtraction(path: string): { path: string; symbol?: string } {
   const match = path.match(/^(.+)#([a-zA-Z_$][a-zA-Z0-9_$]*)$/);
-  if (match) {
+  if (match && match[1] && match[2]) {
     return {
       path: match[1],
       symbol: match[2],
@@ -262,7 +264,7 @@ export function parseImports(content: string): ImportAction[] {
 
   while ((match = FILE_IMPORT_PATTERN.exec(content)) !== null) {
     // Only include imports that are in safe ranges (outside code blocks)
-    if (isInSafeRange(match.index, safeRanges)) {
+    if (isInSafeRange(match.index, safeRanges) && match[1]) {
       const action = parseFileImportPath(match[0], match[1], match.index);
       actions.push(action);
     }
@@ -272,7 +274,7 @@ export function parseImports(content: string): ImportAction[] {
   URL_IMPORT_PATTERN.lastIndex = 0;
   while ((match = URL_IMPORT_PATTERN.exec(content)) !== null) {
     // Only include imports that are in safe ranges (outside code blocks)
-    if (isInSafeRange(match.index, safeRanges)) {
+    if (isInSafeRange(match.index, safeRanges) && match[1]) {
       const urlAction: UrlImportAction = {
         type: 'url',
         url: match[1],
@@ -283,14 +285,16 @@ export function parseImports(content: string): ImportAction[] {
     }
   }
 
-  // Parse command inlines
+  // Parse command inlines (with balanced backtick support)
+  // match[1] = backtick delimiter, match[2] = command content
   COMMAND_INLINE_PATTERN.lastIndex = 0;
   while ((match = COMMAND_INLINE_PATTERN.exec(content)) !== null) {
     // Only include imports that are in safe ranges (outside code blocks)
-    if (isInSafeRange(match.index, safeRanges)) {
+    const commandContent = match[2];
+    if (isInSafeRange(match.index, safeRanges) && commandContent) {
       const cmdAction: CommandImportAction = {
         type: 'command',
-        command: match[1],
+        command: commandContent,
         original: match[0],
         index: match.index,
       };

@@ -150,12 +150,12 @@ async function checkMdCommand(): Promise<MdCommandInfo> {
       // Format: "md is an alias for mkdir -p" or from alias cmd: "md='mkdir -p'"
       let aliasValue = "";
       const aliasMatch = firstLine.match(/is (?:an alias for|aliased to) (.+)/);
-      if (aliasMatch) {
+      if (aliasMatch && aliasMatch[1]) {
         aliasValue = aliasMatch[1];
       } else if (aliasOutput) {
         // Parse alias output like "md='mkdir -p'" or "md=mkdir -p"
         const aliasDefMatch = aliasOutput.match(/md=["']?(.+?)["']?$/);
-        if (aliasDefMatch) {
+        if (aliasDefMatch && aliasDefMatch[1]) {
           aliasValue = aliasDefMatch[1];
         }
       }

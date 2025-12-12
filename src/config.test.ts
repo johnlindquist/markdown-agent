@@ -23,7 +23,7 @@ describe("config", () => {
     const config = await loadGlobalConfig();
     expect(config.commands).toBeDefined();
     expect(config.commands?.copilot).toBeDefined();
-    expect(config.commands?.copilot.$1).toBe("prompt");  // Print mode by default
+    expect(config.commands!.copilot!.$1).toBe("prompt");  // Print mode by default
     expect(config.commands?.claude?.print).toBe(true);   // Print mode by default
     expect(config.commands?.codex?._subcommand).toBe("exec");  // Exec subcommand by default
   });

@@ -1,6 +1,6 @@
 import { resolve, dirname, relative, basename } from "path";
 import { realpathSync } from "fs";
-import { homedir } from "os";
+import { homedir, platform } from "os";
 import { Glob } from "bun";
 import ignore from "ignore";
 import { resilientFetch } from "./fetch";
@@ -8,6 +8,8 @@ import { MAX_INPUT_SIZE, FileSizeLimitError, exceedsLimit } from "./limits";
 import { countTokens, getContextLimit } from "./tokenizer";
 import { Semaphore, DEFAULT_CONCURRENCY_LIMIT } from "./concurrency";
 import { substituteTemplateVars } from "./template";
+import { parseImports as parseImportsSafe } from "./imports-parser";
+import type { ImportAction } from "./imports-types";
 
 /**
  * TTY Dashboard for monitoring parallel command execution
@@ -144,6 +146,11 @@ export interface ImportContext {
    * before execution, allowing dynamic command construction.
    */
   templateVars?: Record<string, string>;
+  /**
+   * Dry-run mode: when true, commands are not executed.
+   * Instead, a placeholder message is returned showing what would have been executed.
+   */
+  dryRun?: boolean;
 }
 
 /**
@@ -238,6 +245,16 @@ export const WARN_TOKENS = 50_000;
 export const CHARS_PER_TOKEN = 4;
 const MAX_CHARS = MAX_TOKENS * CHARS_PER_TOKEN;
 
+/** Command execution timeout in milliseconds (30 seconds) */
+const COMMAND_TIMEOUT_MS = 30_000;
+
+/** Maximum command output size in characters (~25k tokens) */
+const MAX_COMMAND_OUTPUT_SIZE = 100_000;
+
+/** Regex to strip ANSI escape codes from command output */
+// eslint-disable-next-line no-control-regex
+const ANSI_ESCAPE_REGEX = /[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g;
+
 /**
  * Expand a path that may start with ~ to use home directory
  */
@@ -292,7 +309,7 @@ function isGlobPatternInternal(path: string): boolean {
  */
 function parseLineRangeInternal(path: string): { path: string; start?: number; end?: number } {
   const match = path.match(/^(.+):(\d+)-(\d+)$/);
-  if (match) {
+  if (match && match[1] && match[2] && match[3]) {
     return {
       path: match[1],
       start: parseInt(match[2], 10),
@@ -307,7 +324,7 @@ function parseLineRangeInternal(path: string): { path: string; start?: number; e
  */
 function parseSymbolExtractionInternal(path: string): { path: string; symbol?: string } {
   const match = path.match(/^(.+)#([a-zA-Z_$][a-zA-Z0-9_$]*)$/);
-  if (match) {
+  if (match && match[1] && match[2]) {
     return {
       path: match[1],
       symbol: match[2],
@@ -358,7 +375,9 @@ function extractSymbol(content: string, symbolName: string): string {
   let foundDeclaration = false;
 
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
+    const currentLine = lines[i];
+    if (!currentLine) continue;
+    const line = currentLine.trim();
 
     // Check if this line starts the symbol we're looking for
     if (startLine === -1) {
@@ -373,9 +392,9 @@ function extractSymbol(content: string, symbolName: string): string {
 
     if (startLine !== -1) {
       // Count braces/parens to find the end of the declaration
-      for (let j = 0; j < lines[i].length; j++) {
-        const char = lines[i][j];
-        const prevChar = j > 0 ? lines[i][j - 1] : "";
+      for (let j = 0; j < currentLine.length; j++) {
+        const char = currentLine[j];
+        const prevChar = j > 0 ? currentLine[j - 1] : "";
 
         // Handle string literals
         if (!inString && (char === '"' || char === "'" || char === "`")) {
@@ -396,9 +415,10 @@ function extractSymbol(content: string, symbolName: string): string {
       // Check if we've closed all braces (for block declarations)
       if (foundDeclaration && braceDepth === 0 && parenDepth === 0) {
         // For type aliases, we need to check for semicolon or end of statement
-        const currentLine = lines[i].trim();
-        if (currentLine.endsWith(";") || currentLine.endsWith("}") ||
-            (i + 1 < lines.length && !lines[i + 1].trim().startsWith("."))) {
+        const trimmedLine = currentLine.trim();
+        const nextLine = lines[i + 1];
+        if (trimmedLine.endsWith(";") || trimmedLine.endsWith("}") ||
+            (i + 1 < lines.length && nextLine && !nextLine.trim().startsWith("."))) {
           return lines.slice(startLine, i + 1).join("\n");
         }
       }
@@ -493,7 +513,7 @@ const ALLOWED_CONTENT_TYPES = [
 function isAllowedContentType(contentType: string | null): boolean {
   if (!contentType) return false;
   // Extract the base type (ignore charset and other params)
-  const baseType = contentType.split(";")[0].trim().toLowerCase();
+  const baseType = (contentType.split(";")[0] ?? "").trim().toLowerCase();
   return ALLOWED_CONTENT_TYPES.includes(baseType);
 }
 
@@ -841,7 +861,15 @@ export function isMarkdownFileCommand(command: string): boolean {
 }
 
 /**
- * Process a single command inline
+ * Process a single command inline with comprehensive safety measures:
+ * - Dry-run mode support
+ * - Cross-platform shell support (Windows/Unix)
+ * - Execution timeout (30s default)
+ * - Binary output detection
+ * - ANSI escape code stripping
+ * - LiquidJS tag sanitization
+ * - Output size limiting
+ * - Detailed error reporting
  */
 async function processCommandInline(
   command: string,
@@ -873,6 +901,12 @@ async function processCommandInline(
     }
   }
 
+  // Improvement #3: Dry-run safety - skip execution if in dry-run mode
+  if (importCtx?.dryRun) {
+    console.error(`[imports] Dry-run: Skipping execution of '${actualCommand}'`);
+    return `{% raw %}\n[Dry Run: Command "${actualCommand}" not executed]\n{% endraw %}`;
+  }
+
   // Use importCtx.env if provided, otherwise fall back to process.env
   const env = importCtx?.env ?? process.env;
 
@@ -880,8 +914,17 @@ async function processCommandInline(
   // to run commands in the user's current directory), fall back to file directory
   const commandCwd = importCtx?.invocationCwd ?? currentFileDir;
 
+  // Improvement #5: Cross-platform shell support
+  const isWin = platform() === "win32";
+  const shell = isWin ? "cmd.exe" : "sh";
+  const shellArgs = isWin ? ["/d", "/s", "/c", actualCommand] : ["-c", actualCommand];
+
+  // Track process for timeout cleanup
+  let proc: ReturnType<typeof Bun.spawn> | null = null;
+  let timedOut = false;
+
   try {
-    const proc = Bun.spawn(["sh", "-c", actualCommand], {
+    proc = Bun.spawn([shell, ...shellArgs], {
       cwd: commandCwd,
       stdout: "pipe",
       stderr: "pipe",
@@ -914,17 +957,51 @@ async function processCommandInline(
       }
     };
 
-    // Read both streams concurrently
-    await Promise.all([
-      readStream(proc.stdout, stdoutChunks, true),
-      readStream(proc.stderr, stderrChunks, false)
+    // Improvement #4: Execution timeout using Promise.race
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        timedOut = true;
+        proc?.kill();
+        reject(new Error(`Command timed out after ${COMMAND_TIMEOUT_MS}ms: ${actualCommand}`));
+      }, COMMAND_TIMEOUT_MS);
+    });
+
+    // Read streams with timeout (stdout/stderr are guaranteed with "pipe" option)
+    const stdoutStream = proc.stdout as ReadableStream<Uint8Array>;
+    const stderrStream = proc.stderr as ReadableStream<Uint8Array>;
+    await Promise.race([
+      Promise.all([
+        readStream(stdoutStream, stdoutChunks, true),
+        readStream(stderrStream, stderrChunks, false)
+      ]),
+      timeoutPromise
     ]);
 
     await proc.exited;
 
-    // Reconstruct full output
-    const stdout = new TextDecoder().decode(Buffer.concat(stdoutChunks)).trim();
-    const stderr = new TextDecoder().decode(Buffer.concat(stderrChunks)).trim();
+    // Reconstruct full output as bytes first
+    const stdoutBytes = Buffer.concat(stdoutChunks);
+    const stderrBytes = Buffer.concat(stderrChunks);
+
+    // Improvement #9: Detect and block binary output (check first 1KB for null bytes)
+    const checkChunk = new Uint8Array(stdoutBytes.slice(0, 1024));
+    if (checkChunk.includes(0)) {
+      throw new Error(`Command returned binary data. Inline commands must return text: ${actualCommand}`);
+    }
+
+    // Decode to strings
+    let stdout = new TextDecoder().decode(stdoutBytes).trim();
+    let stderr = new TextDecoder().decode(stderrBytes).trim();
+
+    // Improvement #6: Strip ANSI escape codes from output
+    stdout = stdout.replace(ANSI_ESCAPE_REGEX, '');
+    stderr = stderr.replace(ANSI_ESCAPE_REGEX, '');
+
+    // Improvement #10: Detailed error reporting with stderr
+    if (proc.exitCode !== 0) {
+      const errorOutput = stderr || stdout || "No output";
+      throw new Error(`Command failed (Exit ${proc.exitCode}): ${actualCommand}\nOutput: ${errorOutput}`);
+    }
 
     // Combine stdout and stderr (stderr first if both exist)
     let output: string;
@@ -934,14 +1011,27 @@ async function processCommandInline(
       output = stdout || stderr || "";
     }
 
-    // Wrap in {% raw %}...{% endraw %} to prevent LiquidJS from interpreting
-    // any template-like syntax (e.g., {{ variable }}) in command output
+    // Improvement #8: Enforce output size limits
+    if (output.length > MAX_COMMAND_OUTPUT_SIZE) {
+      const truncatedChars = output.length - MAX_COMMAND_OUTPUT_SIZE;
+      output = output.slice(0, MAX_COMMAND_OUTPUT_SIZE) +
+        `\n... [Output truncated: ${truncatedChars.toLocaleString()} characters removed]`;
+    }
+
+    // Improvement #7: Sanitize LiquidJS tags - escape {% endraw %} in output
+    // to prevent breaking out of the raw block
     if (output) {
-      return `{% raw %}\n${output}\n{% endraw %}`;
+      const safeOutput = output.replace(/\{% endraw %\}/g, "{% endraw %}{{ '{% endraw %}' }}{% raw %}");
+      return `{% raw %}\n${safeOutput}\n{% endraw %}`;
     }
     return output;
   } catch (err) {
-    throw new Error(`Command failed: ${actualCommand} - ${(err as Error).message}`);
+    // Include more context in error messages
+    const errorMessage = (err as Error).message;
+    if (errorMessage.includes("timed out") || errorMessage.includes("Exit ")) {
+      throw err; // Re-throw timeout and exit code errors as-is
+    }
+    throw new Error(`Command failed: ${actualCommand} - ${errorMessage}`);
   }
 }
 
@@ -968,34 +1058,40 @@ function parseAllImports(content: string): ParsedImport[] {
   // Parse file imports
   FILE_IMPORT_PATTERN.lastIndex = 0;
   while ((match = FILE_IMPORT_PATTERN.exec(content)) !== null) {
-    imports.push({
-      type: 'file',
-      full: match[0],
-      path: match[1],
-      index: match.index,
-    });
+    if (match[1]) {
+      imports.push({
+        type: 'file',
+        full: match[0],
+        path: match[1],
+        index: match.index,
+      });
+    }
   }
 
   // Parse URL imports
   URL_IMPORT_PATTERN.lastIndex = 0;
   while ((match = URL_IMPORT_PATTERN.exec(content)) !== null) {
-    imports.push({
-      type: 'url',
-      full: match[0],
-      url: match[1],
-      index: match.index,
-    });
+    if (match[1]) {
+      imports.push({
+        type: 'url',
+        full: match[0],
+        url: match[1],
+        index: match.index,
+      });
+    }
   }
 
   // Parse command inlines
   COMMAND_INLINE_PATTERN.lastIndex = 0;
   while ((match = COMMAND_INLINE_PATTERN.exec(content)) !== null) {
-    imports.push({
-      type: 'command',
-      full: match[0],
-      command: match[1],
-      index: match.index,
-    });
+    if (match[1]) {
+      imports.push({
+        type: 'command',
+        full: match[0],
+        command: match[1],
+        index: match.index,
+      });
+    }
   }
 
   // Sort by index to maintain order
@@ -1057,8 +1153,35 @@ export async function expandImports(
     : (contextOrTracker ?? {});
   const resolvedImportsTracker = importCtx.resolvedImports;
 
-  // Phase 1: Parse all imports in a single pass
-  const imports = parseAllImports(content);
+  // Phase 1: Parse all imports using the context-aware parser
+  // SECURITY FIX: Uses parseImportsSafe which ignores imports inside code blocks,
+  // preventing accidental command execution from documentation examples
+  const rawActions = parseImportsSafe(content);
+
+  // Map ImportAction[] from the safe parser to ParsedImport[] for internal processing
+  const imports: ParsedImport[] = rawActions.map(action => {
+    switch (action.type) {
+      case 'file': {
+        // Preserve line range syntax in the path if present
+        let path = action.path;
+        if (action.lineRange) {
+          path = `${action.path}:${action.lineRange.start}-${action.lineRange.end}`;
+        }
+        return { type: 'file' as const, full: action.original, path, index: action.index };
+      }
+      case 'glob':
+        return { type: 'file' as const, full: action.original, path: action.pattern, index: action.index };
+      case 'symbol':
+        return { type: 'file' as const, full: action.original, path: `${action.path}#${action.symbol}`, index: action.index };
+      case 'url':
+        return { type: 'url' as const, full: action.original, url: action.url, index: action.index };
+      case 'command':
+        return { type: 'command' as const, full: action.original, command: action.command, index: action.index };
+      default:
+        // Should never happen, but TypeScript needs exhaustive handling
+        return null as never;
+    }
+  });
 
   // If no imports, return content as-is
   if (imports.length === 0) {

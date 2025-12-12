@@ -75,24 +75,24 @@ describe("Tool Adapter Registry", () => {
 
       // Claude defaults
       expect(defaults.claude).toBeDefined();
-      expect(defaults.claude.print).toBe(true);
+      expect(defaults.claude!.print).toBe(true);
 
       // Copilot defaults
       expect(defaults.copilot).toBeDefined();
-      expect(defaults.copilot.$1).toBe("prompt");
-      expect(defaults.copilot.silent).toBe(true);
+      expect(defaults.copilot!.$1).toBe("prompt");
+      expect(defaults.copilot!.silent).toBe(true);
 
       // Codex defaults
       expect(defaults.codex).toBeDefined();
-      expect(defaults.codex._subcommand).toBe("exec");
+      expect(defaults.codex!._subcommand).toBe("exec");
 
       // Droid defaults
       expect(defaults.droid).toBeDefined();
-      expect(defaults.droid._subcommand).toBe("exec");
+      expect(defaults.droid!._subcommand).toBe("exec");
 
       // Opencode defaults
       expect(defaults.opencode).toBeDefined();
-      expect(defaults.opencode._subcommand).toBe("run");
+      expect(defaults.opencode!._subcommand).toBe("run");
 
       // Gemini has no defaults (empty object not included)
       // Actually, gemini returns empty object, so it won't be in defaults

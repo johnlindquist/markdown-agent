@@ -277,7 +277,7 @@ describe("fetch utilities", () => {
         },
       });
       expect(response.ok).toBe(true);
-      const data = await response.json();
+      const data = await response.json() as { id: number };
       expect(data).toBeDefined();
       expect(data.id).toBe(1);
     });

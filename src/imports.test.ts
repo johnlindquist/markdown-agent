@@ -385,7 +385,7 @@ test("expandImports uses file directory for commands when invocationCwd not set"
   const result = await expandImports(content, testDir);
 
   // Should contain the testDir path
-  expect(result).toContain(testDir.split("/").pop());
+  expect(result).toContain(testDir.split("/").pop()!);
 });
 
 test("expandImports allows _cwd override via ImportContext", async () => {

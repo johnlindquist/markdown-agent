@@ -117,7 +117,10 @@ function parseEnvFile(content: string): Record<string, string> {
     const match = line.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(.*)/);
     if (!match) continue;
 
-    const [, key, rawValue] = match;
+    const key = match[1];
+    const rawValue = match[2];
+    if (!key || rawValue === undefined) continue;
+
     let value = rawValue.trim();
 
     // Handle quoted values
@@ -129,7 +132,7 @@ function parseEnvFile(content: string): Record<string, string> {
       // Start of multiline quoted value
       inMultiline = true;
       currentKey = key;
-      quoteChar = value[0];
+      quoteChar = value[0] ?? null;
       currentValue = [value.slice(1)]; // Remove opening quote
     } else {
       // Unquoted value - remove inline comments

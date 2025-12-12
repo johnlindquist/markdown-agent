@@ -146,8 +146,9 @@ items:
 ---
 Body`;
     const result = parseFrontmatter(content);
-    expect(result.frontmatter.items).toHaveLength(2);
-    expect(result.frontmatter.items[0]).toEqual({ name: "first", value: 1 });
-    expect(result.frontmatter.items[1]).toEqual({ name: "second", value: 2 });
+    const items = result.frontmatter.items as Array<{ name: string; value: number }>;
+    expect(items).toHaveLength(2);
+    expect(items[0]).toEqual({ name: "first", value: 1 });
+    expect(items[1]).toEqual({ name: "second", value: 2 });
   });
 });
