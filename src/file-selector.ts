@@ -478,6 +478,8 @@ export async function showFileSelectorWithPreview(
         openInEditor(result.path);
         // Clear file content cache so preview reflects edits
         fileContentCache.clear();
+        // Clear screen before re-showing selector to avoid duplication artifacts
+        process.stdout.write("\x1b[2J\x1b[H");
         continue;
       }
 
