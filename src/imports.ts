@@ -1191,9 +1191,9 @@ export async function expandImports(
   // Create semaphore for concurrency limiting
   const semaphore = new Semaphore(concurrencyLimit);
 
-  // Initialize dashboard if we have multiple commands and are in a TTY environment
+  // Initialize dashboard if we have any commands and are in a TTY environment
   const commandImports = imports.filter(i => i.type === 'command');
-  const useDashboard = commandImports.length > 1 && process.stderr.isTTY && !verbose;
+  const useDashboard = commandImports.length > 0 && process.stderr.isTTY && !verbose;
   const dashboard = useDashboard ? new ParallelDashboard() : null;
 
   if (dashboard) dashboard.start();
