@@ -43,8 +43,9 @@ export interface AgentFrontmatter {
    * Underscore-prefixed keys are template variables, not passed to CLI.
    * Available in body as {{ _varname }}, can be overridden via --_varname CLI flag.
    * Example: _name: "default" → {{ _name }} in body → --_name "override"
+   * Note: Also includes system keys like _inputs (string[]) and _env (Record<string, string>)
    */
-  [key: `_${string}`]: string | undefined;
+  [key: `_${string}`]: unknown;
 
   /**
    * All other keys are passed directly as CLI flags to the command.

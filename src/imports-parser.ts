@@ -2,10 +2,14 @@
  * Phase 1: Pure Parser
  *
  * Scans content and returns a list of ImportActions.
- * This is a pure function with no I/O - uses a context-aware scanner
+ * This is a pure function with no I/O - uses a markdown AST parser
  * that properly ignores imports inside code blocks.
  */
 
+import { unified } from 'unified';
+import remarkParse from 'remark-parse';
+import { visit } from 'unist-util-visit';
+import type { Root } from 'mdast';
 import type {
   ImportAction,
   FileImportAction,
@@ -17,116 +21,80 @@ import type {
 } from './imports-types';
 
 /**
- * Context state for the scanner
+ * Range type for code regions and safe ranges
  */
-type ScanContext = 'normal' | 'fenced_code' | 'inline_code';
+interface Range {
+  start: number;
+  end: number;
+}
 
 /**
- * Scans content character by character, tracking context to determine
- * if we're inside a code block (fenced or inline).
+ * Inverts code regions to get safe ranges.
+ * Given regions where code exists, returns regions where code doesn't exist.
+ */
+function invertRanges(codeRegions: Range[], contentLength: number): Range[] {
+  const safeRanges: Range[] = [];
+  let current = 0;
+
+  for (const region of codeRegions) {
+    if (current < region.start) {
+      safeRanges.push({ start: current, end: region.start });
+    }
+    current = region.end;
+  }
+
+  if (current < contentLength) {
+    safeRanges.push({ start: current, end: contentLength });
+  }
+
+  return safeRanges;
+}
+
+/**
+ * Uses a markdown AST parser to find code blocks (fenced and inline),
+ * then returns the "safe" ranges where imports can be parsed.
  *
  * Returns an array of "safe" ranges where imports can be parsed.
  * Exported for unit testing.
  */
-export function findSafeRanges(content: string): Array<{ start: number; end: number }> {
-  const safeRanges: Array<{ start: number; end: number }> = [];
-  let context: ScanContext = 'normal';
-  let rangeStart = 0;
-  let i = 0;
-  let fenceChar = '';
-  let fenceLen = 0;
+export function findSafeRanges(content: string): Range[] {
+  if (content.length === 0) {
+    return [];
+  }
 
-  while (i < content.length) {
-    if (context === 'normal') {
-      // Check for fenced code block start (3+ backticks or tildes)
-      if (content[i] === '`' || content[i] === '~') {
-        const char = content[i]!; // Safe: already checked above
-        let len = 0;
-        let j = i;
-        while (j < content.length && content[j] === char) {
-          len++;
-          j++;
-        }
+  const processor = unified().use(remarkParse);
+  const ast = processor.parse(content) as Root;
 
-        if (len >= 3) {
-          // It's a fence
-          if (i > rangeStart) {
-            safeRanges.push({ start: rangeStart, end: i });
-          }
-          context = 'fenced_code';
-          fenceChar = char;
-          fenceLen = len;
-          i += len;
-          // Skip info string
-          while (i < content.length && content[i] !== '\n') {
-            i++;
-          }
-          continue;
-        }
-      }
+  // Collect all code regions (fenced + inline)
+  const codeRegions: Range[] = [];
 
-      // Check for inline code start (single backtick, not followed by another)
-      if (content[i] === '`' && content[i + 1] !== '`') {
-        // End current safe range before the backtick
-        if (i > rangeStart) {
-          safeRanges.push({ start: rangeStart, end: i });
-        }
-        context = 'inline_code';
-        i++;
-        continue;
-      }
-
-      i++;
-    } else if (context === 'fenced_code') {
-      // Look for closing fence
-      const atLineStart = i === 0 || content[i - 1] === '\n';
-      if (atLineStart && content[i] === fenceChar) {
-        let len = 0;
-        let j = i;
-        while (j < content.length && content[j] === fenceChar) {
-          len++;
-          j++;
-        }
-
-        if (len >= fenceLen) {
-          // Close it
-          i += len;
-          // Skip to end of line
-          while (i < content.length && content[i] !== '\n') {
-            i++;
-          }
-          if (i < content.length) {
-            i++; // Skip the newline
-          }
-          context = 'normal';
-          rangeStart = i;
-          continue;
-        }
-      }
-      i++;
-    } else if (context === 'inline_code') {
-      // Look for closing backtick
-      if (content[i] === '`') {
-        i++; // Skip the closing backtick
-        context = 'normal';
-        rangeStart = i;
-        continue;
-      }
-      // Inline code cannot span multiple lines in standard markdown
-      if (content[i] === '\n') {
-        context = 'normal';
-        rangeStart = i;
-      }
-      i++;
+  // Find fenced/indented code blocks
+  visit(ast, 'code', (node) => {
+    if (node.position?.start.offset !== undefined &&
+        node.position?.end.offset !== undefined) {
+      codeRegions.push({
+        start: node.position.start.offset,
+        end: node.position.end.offset,
+      });
     }
-  }
+  });
 
-  // Add final range if we ended in normal context
-  if (context === 'normal' && rangeStart < content.length) {
-    safeRanges.push({ start: rangeStart, end: content.length });
-  }
+  // Find inline code spans
+  visit(ast, 'inlineCode', (node) => {
+    if (node.position?.start.offset !== undefined &&
+        node.position?.end.offset !== undefined) {
+      codeRegions.push({
+        start: node.position.start.offset,
+        end: node.position.end.offset,
+      });
+    }
+  });
 
-  return safeRanges;
+  // Sort by start position (important for invertRanges)
+  codeRegions.sort((a, b) => a.start - b.start);
+
+  // Invert to get safe ranges
+  return invertRanges(codeRegions, content.length);
 }
 
 /**

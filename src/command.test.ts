@@ -1,5 +1,6 @@
 import { expect, test, describe } from "bun:test";
 import { parseCommandFromFilename, resolveCommand, buildArgs, extractPositionalMappings, extractEnvVars, getCurrentChildProcess, killCurrentChildProcess, runCommand, type CaptureMode } from "./command";
+import type { AgentFrontmatter } from "./types";
 
 describe("parseCommandFromFilename", () => {
   test("extracts command from filename pattern", () => {
@@ -60,7 +61,7 @@ describe("buildArgs", () => {
     const result = buildArgs({
       _inputs: ["message", "branch"],
       model: "opus",
-    }, new Set());
+    } as AgentFrontmatter, new Set());
     expect(result).toEqual(["--model", "opus"]);
   });
 
@@ -77,7 +78,7 @@ describe("buildArgs", () => {
     const result = buildArgs({
       _env: { HOST: "localhost" },
       model: "opus",
-    }, new Set());
+    } as AgentFrontmatter, new Set());
     expect(result).toEqual(["--model", "opus"]);
   });
 
@@ -128,7 +129,7 @@ describe("extractEnvVars", () => {
   test("extracts _env object", () => {
     const env = extractEnvVars({
       _env: { HOST: "localhost", PORT: "3000" },
-    });
+    } as AgentFrontmatter);
     expect(env).toEqual({ HOST: "localhost", PORT: "3000" });
   });
 

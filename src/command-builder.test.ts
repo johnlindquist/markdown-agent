@@ -47,18 +47,18 @@ describe("buildArgsFromFrontmatter", () => {
 
   describe("boolean flags", () => {
     it("includes flag for boolean true", () => {
-      const result = buildArgsFromFrontmatter({ verbose: true }, new Set());
+      const result = buildArgsFromFrontmatter({ verbose: true } as AgentFrontmatter, new Set());
       expect(result).toEqual(["--verbose"]);
     });
 
     it("omits flag for boolean false", () => {
-      const result = buildArgsFromFrontmatter({ verbose: false }, new Set());
+      const result = buildArgsFromFrontmatter({ verbose: false } as AgentFrontmatter, new Set());
       expect(result).toEqual([]);
     });
 
     it("handles multiple boolean flags", () => {
       const result = buildArgsFromFrontmatter(
-        { verbose: true, debug: false, quiet: true },
+        { verbose: true, debug: false, quiet: true } as AgentFrontmatter,
         new Set()
       );
       expect(result).toContain("--verbose");
@@ -68,7 +68,7 @@ describe("buildArgsFromFrontmatter", () => {
 
     it("handles dangerously-skip-permissions style flags", () => {
       const result = buildArgsFromFrontmatter(
-        { "dangerously-skip-permissions": true },
+        { "dangerously-skip-permissions": true } as AgentFrontmatter,
         new Set()
       );
       expect(result).toEqual(["--dangerously-skip-permissions"]);
@@ -108,13 +108,13 @@ describe("buildArgsFromFrontmatter", () => {
 
   describe("single-character flags", () => {
     it("uses single dash for single-char flags", () => {
-      const result = buildArgsFromFrontmatter({ p: true }, new Set());
+      const result = buildArgsFromFrontmatter({ p: true } as AgentFrontmatter, new Set());
       expect(result).toEqual(["-p"]);
     });
 
     it("handles multiple single-char flags", () => {
       const result = buildArgsFromFrontmatter(
-        { p: true, c: true, v: false },
+        { p: true, c: true, v: false } as AgentFrontmatter,
         new Set()
       );
       expect(result).toContain("-p");
@@ -131,7 +131,7 @@ describe("buildArgsFromFrontmatter", () => {
   describe("system keys (skipped)", () => {
     it("skips _inputs key", () => {
       const result = buildArgsFromFrontmatter(
-        { _inputs: ["message", "branch"], model: "opus" },
+        { _inputs: ["message", "branch"], model: "opus" } as AgentFrontmatter,
         new Set()
       );
       expect(result).toEqual(["--model", "opus"]);
@@ -197,7 +197,7 @@ describe("buildArgsFromFrontmatter", () => {
 
     it("skips all underscore-prefixed keys", () => {
       const result = buildArgsFromFrontmatter(
-        { _custom: "value", _another: true, model: "opus" },
+        { _custom: "value", _another: true, model: "opus" } as AgentFrontmatter,
         new Set()
       );
       expect(result).toEqual(["--model", "opus"]);
@@ -378,7 +378,7 @@ describe("extractEnvVars", () => {
   it("extracts _env object", () => {
     const env = extractEnvVars({
       _env: { HOST: "localhost", PORT: "3000" },
-    });
+    } as AgentFrontmatter);
     expect(env).toEqual({ HOST: "localhost", PORT: "3000" });
   });
 
@@ -390,7 +390,7 @@ describe("extractEnvVars", () => {
   });
 
   it("handles empty _env object", () => {
-    const env = extractEnvVars({ _env: {} });
+    const env = extractEnvVars({ _env: {} } as AgentFrontmatter);
     expect(env).toEqual({});
   });
 });
@@ -556,7 +556,7 @@ describe("buildCommand", () => {
   it("extracts env vars from frontmatter", () => {
     const result = buildCommand(
       "claude",
-      { _env: { API_KEY: "secret", DEBUG: "true" } },
+      { _env: { API_KEY: "secret", DEBUG: "true" } } as AgentFrontmatter,
       "body",
       [],
       new Set(),
@@ -634,7 +634,7 @@ describe("buildCommand", () => {
   });
 
   it("handles complex frontmatter", () => {
-    const frontmatter: AgentFrontmatter = {
+    const frontmatter = {
       model: "opus",
       verbose: true,
       debug: false,
@@ -642,7 +642,7 @@ describe("buildCommand", () => {
       $1: "prompt",
       _env: { NODE_ENV: "test" },
       _inputs: ["message"],
-    };
+    } as AgentFrontmatter;
 
     const result = buildCommand(
       "claude",
@@ -705,7 +705,7 @@ describe("buildCommand", () => {
   it("handles _subcommand as array", () => {
     const result = buildCommand(
       "codex",
-      { _subcommand: ["sub1", "sub2"] },
+      { _subcommand: ["sub1", "sub2"] } as AgentFrontmatter,
       "body",
       [],
       new Set(),
@@ -765,7 +765,7 @@ describe("buildCommandBase", () => {
   it("extracts env vars", () => {
     const result = buildCommandBase(
       "claude",
-      { _env: { KEY: "value" } },
+      { _env: { KEY: "value" } } as AgentFrontmatter,
       new Set(),
       emptyConfig,
       cwd
@@ -845,7 +845,7 @@ describe("extractSubcommands", () => {
   });
 
   it("returns array with multiple subcommands", () => {
-    const result = extractSubcommands({ _subcommand: ["sub1", "sub2"] });
+    const result = extractSubcommands({ _subcommand: ["sub1", "sub2"] } as AgentFrontmatter);
     expect(result).toEqual(["sub1", "sub2"]);
   });
 
@@ -1029,7 +1029,7 @@ describe("integration scenarios", () => {
       {
         _env: { ANTHROPIC_API_KEY: "sk-test", DEBUG: "1" },
         model: "opus",
-      },
+      } as AgentFrontmatter,
       "body",
       [],
       new Set(),
@@ -1057,7 +1057,7 @@ describe("integration scenarios", () => {
         _inputs: ["_target"],  // Declares template var (skipped)
         _target: "src/app.ts",  // Template var value (skipped)
         model: "opus",
-      },
+      } as AgentFrontmatter,
       "Review {{ _target }}",  // Body with template (already substituted upstream)
       [],
       templateVars,
@@ -1173,14 +1173,14 @@ describe("dry-run consistency guarantee", () => {
   });
 
   it("handles complex frontmatter identically in both paths", () => {
-    const frontmatter: AgentFrontmatter = {
+    const frontmatter = {
       model: "opus",
       "dangerously-skip-permissions": true,
       "add-dir": ["./src", "./tests"],
       $1: "prompt",
       _subcommand: "chat",
       _env: { API_KEY: "secret" },
-    };
+    } as AgentFrontmatter;
 
     const spec = buildCommand(
       "custom-cli",

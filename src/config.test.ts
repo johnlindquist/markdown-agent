@@ -10,6 +10,7 @@ import {
   loadFullConfig,
   clearProjectConfigCache,
 } from "./config";
+import type { AgentFrontmatter } from "./types";
 import { mkdirSync, writeFileSync, rmSync, existsSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
@@ -314,7 +315,7 @@ describe("config cascade", () => {
 
 describe("applyInteractiveMode", () => {
   test("removes print flag for claude with _interactive: true", () => {
-    const frontmatter = { print: true, model: "opus", _interactive: true };
+    const frontmatter = { print: true, model: "opus", _interactive: true } as AgentFrontmatter;
     const result = applyInteractiveMode(frontmatter, "claude");
     expect(result.print).toBeUndefined();
     expect(result._interactive).toBeUndefined();
@@ -322,7 +323,7 @@ describe("applyInteractiveMode", () => {
   });
 
   test("removes print flag for claude with _i: true", () => {
-    const frontmatter = { print: true, model: "opus", _i: true };
+    const frontmatter = { print: true, model: "opus", _i: true } as AgentFrontmatter;
     const result = applyInteractiveMode(frontmatter, "claude");
     expect(result.print).toBeUndefined();
     expect(result._i).toBeUndefined();
@@ -330,14 +331,14 @@ describe("applyInteractiveMode", () => {
   });
 
   test("handles _interactive with null value (YAML empty key)", () => {
-    const frontmatter = { print: true, _interactive: null };
+    const frontmatter = { print: true, _interactive: null } as AgentFrontmatter;
     const result = applyInteractiveMode(frontmatter, "claude");
     expect(result.print).toBeUndefined();
     expect(result._interactive).toBeUndefined();
   });
 
   test("handles _i with null value (YAML empty key)", () => {
-    const frontmatter = { print: true, _i: null };
+    const frontmatter = { print: true, _i: null } as AgentFrontmatter;
     const result = applyInteractiveMode(frontmatter, "claude");
     expect(result.print).toBeUndefined();
     expect(result._i).toBeUndefined();
@@ -356,7 +357,7 @@ describe("applyInteractiveMode", () => {
   });
 
   test("does not trigger interactive mode with _interactive: false", () => {
-    const frontmatter = { print: true, _interactive: false };
+    const frontmatter = { print: true, _interactive: false } as AgentFrontmatter;
     const result = applyInteractiveMode(frontmatter, "claude");
     expect(result.print).toBe(true);
   });
@@ -375,26 +376,26 @@ describe("applyInteractiveMode", () => {
   });
 
   test("changes copilot $1 from prompt to interactive", () => {
-    const frontmatter = { $1: "prompt", silent: true, _interactive: true };
+    const frontmatter = { $1: "prompt", silent: true, _interactive: true } as AgentFrontmatter;
     const result = applyInteractiveMode(frontmatter, "copilot");
     expect(result.$1).toBe("interactive");
     expect(result.silent).toBe(true);
   });
 
   test("removes _subcommand for codex", () => {
-    const frontmatter = { _subcommand: "exec", _interactive: true };
+    const frontmatter = { _subcommand: "exec", _interactive: true } as AgentFrontmatter;
     const result = applyInteractiveMode(frontmatter, "codex");
     expect(result._subcommand).toBeUndefined();
   });
 
   test("adds prompt-interactive for gemini", () => {
-    const frontmatter = { model: "pro", _interactive: true };
+    const frontmatter = { model: "pro", _interactive: true } as AgentFrontmatter;
     const result = applyInteractiveMode(frontmatter, "gemini");
     expect(result.$1).toBe("prompt-interactive");
   });
 
   test("unknown command just removes _interactive", () => {
-    const frontmatter = { custom: "value", _interactive: true };
+    const frontmatter = { custom: "value", _interactive: true } as AgentFrontmatter;
     const result = applyInteractiveMode(frontmatter, "my-custom-cli");
     expect(result._interactive).toBeUndefined();
     expect(result.custom).toBe("value");

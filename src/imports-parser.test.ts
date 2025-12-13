@@ -830,10 +830,11 @@ describe('findSafeRanges', () => {
   });
 
   it('handles double backticks (not triple)', () => {
-    // Double backticks followed by single should NOT start fenced code
+    // Per CommonMark spec, double backticks are valid inline code delimiters
+    // `` @./file.md `` is a single inline code span containing "@./file.md"
     const content = '`` @./file.md ``';
     const ranges = findSafeRanges(content);
-    // Double backtick starts inline code that ends at next backtick
-    expect(ranges.length).toBeGreaterThan(0);
+    // Entire content is inline code, so no safe ranges
+    expect(ranges).toHaveLength(0);
   });
 });
