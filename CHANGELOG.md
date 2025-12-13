@@ -1,3 +1,10 @@
+# [2.30.0](https://github.com/johnlindquist/mdflow/compare/v2.29.0...v2.30.0) (2025-12-13)
+
+
+### Features
+
+* add executable code fence support ([99df5b0](https://github.com/johnlindquist/mdflow/commit/99df5b0fb4acddc24838ffaca9980ec79aff99f5))
+
 # [2.29.0](https://github.com/johnlindquist/mdflow/compare/v2.28.0...v2.29.0) (2025-12-12)
 
 
