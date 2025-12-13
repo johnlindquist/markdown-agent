@@ -1,3 +1,10 @@
+## [2.30.1](https://github.com/johnlindquist/mdflow/compare/v2.30.0...v2.30.1) (2025-12-13)
+
+
+### Bug Fixes
+
+* update types.ts comment to reflect underscore prefix convention ([1b51ba9](https://github.com/johnlindquist/mdflow/commit/1b51ba9a896143f654c18fdec96086670ce8256b))
+
 # [2.30.0](https://github.com/johnlindquist/mdflow/compare/v2.29.0...v2.30.0) (2025-12-13)
 
 
