@@ -15,7 +15,11 @@ import {
   resolveCommand, buildArgs, runCommand, extractPositionalMappings,
   extractEnvVars, killCurrentChildProcess, hasInteractiveMarker,
 } from "./command";
-import { expandImports, hasImports } from "./imports";
+import {
+  expandImports, hasImports,
+  expandContentImports, expandCommandImports,
+  hasContentImports, hasCommandImports
+} from "./imports";
 import { loadEnvFiles } from "./env";
 import {
   loadGlobalConfig, getCommandDefaults, applyDefaults, applyInteractiveMode,
@@ -440,26 +444,31 @@ export class CliRunner {
     // Update remaining to only contain flag args (positionals consumed for templates)
     remaining = flagArgs;
 
-    // Expand imports
-    let expandedBody = rawBody;
+    // 3-Phase Import Pipeline:
+    // Phase 1: Expand content imports (file, glob, url, symbol) - leave commands untouched
+    // Phase 2: LiquidJS template processing ({% capture %}, {{ var }}, etc.)
+    // Phase 3: Expand command imports with resolved template vars
+
     const fileDir = dirname(resolve(localFilePath));
-    if (hasImports(rawBody)) {
+    const commandCwd = cwdFromCli ?? (frontmatter._cwd as string | undefined) ?? this.cwd;
+
+    // Phase 1: Expand content imports only
+    let phase1Body = rawBody;
+    if (hasContentImports(rawBody)) {
       try {
-        const commandCwd = cwdFromCli ?? (frontmatter._cwd as string | undefined) ?? this.cwd;
-        getImportLogger().debug({ fileDir, commandCwd, templateVarCount: Object.keys(templateVars).length }, "Expanding imports");
-        expandedBody = await expandImports(rawBody, fileDir, new Set(), false, {
+        getImportLogger().debug({ fileDir, commandCwd }, "Phase 1: Expanding content imports");
+        phase1Body = await expandContentImports(rawBody, fileDir, new Set(), false, {
           invocationCwd: commandCwd,
-          templateVars,
         });
-        getImportLogger().debug({ originalLength: rawBody.length, expandedLength: expandedBody.length }, "Imports expanded");
+        getImportLogger().debug({ originalLength: rawBody.length, expandedLength: phase1Body.length }, "Phase 1 complete");
       } catch (err) {
-        getImportLogger().error({ error: (err as Error).message }, "Import expansion failed");
+        getImportLogger().error({ error: (err as Error).message }, "Phase 1 import expansion failed");
         throw new ImportError(`Import error: ${(err as Error).message}`);
       }
     }
 
-    // Missing vars
-    const requiredVars = extractTemplateVars(expandedBody);
+    // Check for missing template vars (based on Phase 1 result)
+    const requiredVars = extractTemplateVars(phase1Body);
     const missingVars = requiredVars.filter((v) => !(v in templateVars));
     if (missingVars.length > 0) {
       if (this.isStdinTTY) {
@@ -470,9 +479,26 @@ export class CliRunner {
       }
     }
 
-    getTemplateLogger().debug({ vars: Object.keys(templateVars) }, "Substituting template variables");
-    const body = substituteTemplateVars(expandedBody, templateVars);
-    getTemplateLogger().debug({ bodyLength: body.length }, "Template substitution complete");
+    // Phase 2: LiquidJS template substitution
+    getTemplateLogger().debug({ vars: Object.keys(templateVars) }, "Phase 2: Substituting template variables");
+    const phase2Body = substituteTemplateVars(phase1Body, templateVars);
+    getTemplateLogger().debug({ bodyLength: phase2Body.length }, "Phase 2 complete");
+
+    // Phase 3: Expand command imports with resolved template vars
+    let phase3Body = phase2Body;
+    if (hasCommandImports(phase2Body)) {
+      try {
+        getImportLogger().debug({ commandCwd, templateVarCount: Object.keys(templateVars).length }, "Phase 3: Expanding command imports");
+        phase3Body = await expandCommandImports(phase2Body, fileDir, false, {
+          invocationCwd: commandCwd,
+          templateVars,
+        });
+        getImportLogger().debug({ expandedLength: phase3Body.length }, "Phase 3 complete");
+      } catch (err) {
+        getImportLogger().error({ error: (err as Error).message }, "Phase 3 command expansion failed");
+        throw new ImportError(`Command error: ${(err as Error).message}`);
+      }
+    }
 
     // Cat file if no frontmatter
     if (Object.keys(baseFrontmatter).length === 0 && !commandDefaults) {
@@ -480,7 +506,7 @@ export class CliRunner {
       catch { this.writeStdout(await this.env.fs.readText(localFilePath)); throw new EarlyExitRequest(); }
     }
 
-    let finalBody = body;
+    let finalBody = phase3Body;
 
     const templateVarSet = new Set(Object.keys(templateVars));
     const args = [...buildArgs(frontmatter, templateVarSet), ...remaining];

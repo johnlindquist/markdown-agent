@@ -7,11 +7,11 @@ describe("validateFrontmatter", () => {
     expect(result).toEqual({});
   });
 
-  test("validates args array", () => {
+  test("validates _inputs array", () => {
     const result = validateFrontmatter({
-      args: ["message", "branch"]
+      _inputs: ["message", "branch"]
     });
-    expect(result.args).toEqual(["message", "branch"]);
+    expect(result._inputs).toEqual(["message", "branch"]);
   });
 
   test("validates env as object (process.env config)", () => {
@@ -63,14 +63,14 @@ describe("safeParseFrontmatter", () => {
     expect(result.data?.model).toBe("opus");
   });
 
-  test("returns success with args", () => {
-    const result = safeParseFrontmatter({ args: ["name", "value"] });
+  test("returns success with _inputs", () => {
+    const result = safeParseFrontmatter({ _inputs: ["name", "value"] });
     expect(result.success).toBe(true);
-    expect(result.data?.args).toEqual(["name", "value"]);
+    expect(result.data?._inputs).toEqual(["name", "value"]);
   });
 
-  test("returns errors when args is not an array", () => {
-    const result = safeParseFrontmatter({ args: "invalid" });
+  test("returns errors when _inputs is not an array", () => {
+    const result = safeParseFrontmatter({ _inputs: "invalid" });
     expect(result.success).toBe(false);
     expect(result.errors).toBeDefined();
   });

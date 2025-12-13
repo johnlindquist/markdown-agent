@@ -401,10 +401,12 @@ mdflow create-feature.claude.md --_feature_name "Auth"
 
 ### Environment Variables
 
+Use `_env` (underscore prefix) to set environment variables for the command:
+
 ```markdown
 # api-test.claude.md
 ---
-env:
+_env:
   API_URL: https://api.example.com
   DEBUG: "true"
 ---

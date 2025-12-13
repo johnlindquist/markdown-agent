@@ -43,13 +43,11 @@ This will run echo (which exists) but we'll check for log path in output
   });
 
   test("shows log path on missing template variables", () => {
-    // Create an agent with required template variable but don't provide it
+    // Create an agent with required underscore-prefixed template variable but don't provide it
     const agentFile = join(TEST_DIR, "missing-var.claude.md");
     writeFileSync(agentFile, `---
-args:
-  - required_var
 ---
-Hello {{ required_var }}
+Hello {{ _required_var }}
 `);
 
     const result = spawnSync("bun", [CLI_PATH, agentFile], {

@@ -199,7 +199,7 @@ Hello {{ _name }}`);
     it("throws error for missing template vars in non-interactive mode", async () => {
       env.addFile("/test/missing.echo.md", `---
 ---
-Hello {{ missing_var }}`);
+Hello {{ _missing_var }}`);
 
       const runner = new CliRunner({
         env,

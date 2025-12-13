@@ -9,20 +9,42 @@ export interface TemplateVars {
   [key: string]: string;
 }
 
+/**
+ * Cross-platform shell escaping helper
+ * Prevents command injection when template variables are used in shell commands
+ */
+function shellEscape(str: unknown): string {
+  const s = String(str ?? "");
+  if (process.platform === "win32") {
+    // Windows cmd.exe escaping (double-quote wrapping, escape internal quotes)
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+  // POSIX single quoting (escape single quotes by ending quote, adding escaped quote, starting new quote)
+  return `'${s.replace(/'/g, "'\\''")}'`;
+}
+
 // Shared Liquid engine instance with lenient settings
 const engine = new Liquid({
-  strictVariables: false,  // Don't throw on undefined variables
-  strictFilters: false,    // Don't throw on undefined filters
+  strictVariables: false, // Don't throw on undefined variables
+  strictFilters: false, // Don't throw on undefined filters
 });
+
+// Register security filters for shell escaping
+engine.registerFilter("shell_escape", shellEscape);
+engine.registerFilter("q", shellEscape); // Short alias
 
 /**
  * Extract template variables from content using LiquidJS AST parsing
+ *
+ * STRICT MODE: Only extracts variables starting with '_' (underscore prefix).
+ * This prevents {{ model }} in text from stealing the --model CLI flag.
+ *
  * Returns array of global variable names (root segments) found in:
- * - {{ variable }} output patterns
- * - {% if variable %}, {% unless variable %}, {% elsif variable %} logic tags
- * - {% for item in collection %} loop tags
- * - Variables with filters: {{ name | upcase }}
- * - Nested variables: {{ user.name }} (returns "user" as the root)
+ * - {{ _variable }} output patterns
+ * - {% if _variable %} logic tags
+ * - {% for item in _collection %} loop tags
+ * - Variables with filters: {{ _name | upcase }}
+ * - Nested variables: {{ _user.name }} (returns "_user" as the root)
  *
  * Uses LiquidJS's analyzeSync for accurate AST-based extraction,
  * avoiding regex fragility with complex Liquid syntax.
@@ -33,8 +55,9 @@ export function extractTemplateVars(content: string): string[] {
     const templates = engine.parse(content);
     // Analyze to find all global variables (undefined in template scope)
     const analysis = analyzeSync(templates, { partials: false });
-    // Return the root variable names from globals
-    return Object.keys(analysis.globals);
+    // Only return variables starting with underscore
+    // This prevents {{ model }} from consuming --model flags
+    return Object.keys(analysis.globals).filter((k) => k.startsWith("_"));
   } catch {
     // Fallback: return empty array if template parsing fails
     // This maintains backward compatibility for malformed templates
@@ -61,7 +84,7 @@ export function substituteTemplateVars(
   if (strict) {
     // In strict mode, check for missing variables before rendering
     const required = extractTemplateVars(content);
-    const missing = required.filter(v => !(v in vars));
+    const missing = required.filter((v) => !(v in vars));
     if (missing.length > 0) {
       throw new Error(`Missing required template variable: ${missing[0]}`);
     }

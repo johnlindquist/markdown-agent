@@ -95,7 +95,8 @@ Commands are resolved in priority order:
 - `_stdin`: Auto-injected template variable containing piped input
 - `_1`, `_2`, etc.: Auto-injected positional CLI args (e.g., `md task.md "foo"` → `{{ _1 }}` = "foo")
 - `_args`: Auto-injected numbered list of all positional args
-- `env` (object form): Sets process.env before execution
+- `_inputs`: Named positional arguments to consume from CLI (e.g., `_inputs: [_message]`)
+- `_env`: Sets process.env before execution
 - `$1`, `$2`, etc.: Map positional args to flags
 - `_interactive`: Enable interactive mode (overrides print-mode defaults)
 - `_subcommand`: Prepend subcommand(s) to CLI args (e.g., `_subcommand: exec`)
@@ -112,7 +113,7 @@ dangerously-skip-permissions: true  # → --dangerously-skip-permissions
 add-dir:                     # → --add-dir ./src --add-dir ./tests
   - ./src
   - ./tests
-env:                         # Object form: sets process.env
+_env:                        # Sets process.env (underscore prefix = system key)
   API_KEY: secret
 ---
 ```

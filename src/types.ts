@@ -15,19 +15,19 @@ export interface IOStreams {
 /** Frontmatter configuration - keys become CLI flags */
 export interface AgentFrontmatter {
   /** Named positional arguments to consume from CLI and map to template vars */
-  args?: string[];
+  _inputs?: string[];
 
   /**
-   * Environment variables (polymorphic):
-   * - Object { KEY: "VAL" }: Sets process.env before execution
-   * - Array ["KEY=VAL"] or String "KEY=VAL": Passes as --env flags to command
+   * Environment variables to set in process.env before execution.
+   * Uses underscore prefix to avoid namespace collision with CLI --env flags.
    */
-  env?: Record<string, string> | string[] | string;
+  _env?: Record<string, string>;
 
   /**
    * Context window limit override (in tokens)
    * If set, overrides the model-based default context limit
    * Useful for custom models or when you want to enforce a specific limit
+   * Note: This is a system key and is NOT passed as a CLI flag.
    */
   context_window?: number;
 

@@ -39,13 +39,37 @@ export function killCurrentChildProcess(): boolean {
 }
 
 /**
- * Keys handled by the system, not passed to the command
- * - args: consumed for template variable mapping
- * - env (when object): sets process.env, not passed as flag
- * - $N patterns: positional mapping, handled specially
+ * Keys strictly reserved for mdflow internal logic.
+ * These are NEVER passed as flags to the command.
+ *
+ * Note: Keys starting with '_' are already filtered in buildArgs,
+ * but we list them here for documentation and explicit filtering.
  */
 const SYSTEM_KEYS = new Set([
-  "args",
+  // Template variable mapping
+  "_inputs", // Named positional arguments
+
+  // Environment configuration
+  "_env", // Sets process.env
+
+  // Internal config (prevents context_window from leaking as --context_window)
+  "context_window",
+  "_context_window",
+
+  // Mode control
+  "_interactive",
+  "_i",
+
+  // Execution control
+  "_subcommand",
+  "_cwd",
+  "_dry-run",
+  "_trust",
+  "_no-cache",
+
+  // Command override
+  "_command",
+  "_c",
 ]);
 
 /**
@@ -132,15 +156,6 @@ export function buildArgs(
     // Skip template variables (used for substitution, not passed to command)
     if (templateVars.has(key)) continue;
 
-    // Handle polymorphic env key
-    if (key === "env") {
-      // Object form: sets process.env, skip here
-      if (typeof value === "object" && value !== null && !Array.isArray(value)) {
-        continue;
-      }
-      // Array/string form: pass as --env flags (fall through)
-    }
-
     // Skip undefined/null/false
     if (value === undefined || value === null || value === false) continue;
 
@@ -183,10 +198,14 @@ export function extractPositionalMappings(frontmatter: AgentFrontmatter): Map<nu
 }
 
 /**
- * Extract environment variables to set (from object form of env)
+ * Extract environment variables to set (from _env key)
+ *
+ * Uses the `_env` key which follows the underscore-prefix convention
+ * for system keys that are consumed by mdflow and not passed to the command.
  */
 export function extractEnvVars(frontmatter: AgentFrontmatter): Record<string, string> | undefined {
-  const env = frontmatter.env;
+  // Use _env key
+  const env = frontmatter._env;
   if (typeof env === "object" && env !== null && !Array.isArray(env)) {
     return env as Record<string, string>;
   }

@@ -117,7 +117,7 @@ Hello World`);
     it("extracts environment variables from frontmatter", async () => {
       const filePath = join(tempDir, "env.claude.md");
       await writeFile(filePath, `---
-env:
+_env:
   API_KEY: secret123
   DEBUG: "true"
 ---
@@ -237,18 +237,18 @@ Mode: {{ _mode }}`);
 
     it("throws error for missing required variables in non-interactive mode", async () => {
       const filePath = join(tempDir, "missing.claude.md");
-      await writeFile(filePath, `---\n---\nHello {{ name }}!`);
+      await writeFile(filePath, `---\n---\nHello {{ _name }}!`);
 
       const runtime = createRuntime();
       const resolved = await runtime.resolve(filePath);
       const context = await runtime.buildContext(resolved);
 
-      await expect(runtime.processTemplate(context)).rejects.toThrow("Missing template variables: name");
+      await expect(runtime.processTemplate(context)).rejects.toThrow("Missing template variables: _name");
     });
 
     it("prompts for missing variables when promptForMissing is provided", async () => {
       const filePath = join(tempDir, "prompt.claude.md");
-      await writeFile(filePath, `---\n---\nHello {{ name }}!`);
+      await writeFile(filePath, `---\n---\nHello {{ _name }}!`);
 
       const runtime = createRuntime();
       const resolved = await runtime.resolve(filePath);
@@ -448,7 +448,7 @@ Hello {{ _name }}, please {{ _action }}`);
     it("includes environment variables in ExecutionPlan", async () => {
       const filePath = join(tempDir, "env.claude.md");
       await writeFile(filePath, `---
-env:
+_env:
   API_KEY: test-key
   DEBUG: "true"
 ---

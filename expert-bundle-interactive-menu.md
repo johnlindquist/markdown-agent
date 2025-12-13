@@ -1,3 +1,26 @@
+# Interactive Selection Menu UX Review Bundle
+
+## Context
+mdflow's interactive agent selector (triggered by running `md` with no arguments). Split-pane UI with fuzzy filtering, file preview, and keyboard navigation. Built on `@inquirer/core`.
+
+## Implemented UX Improvements
+
+Based on expert feedback, the following improvements were made:
+
+1. **Scored Search** - Replaced boolean fuzzy match with ranked scoring (exact > starts-with > contains > path-match > fuzzy)
+2. **Multi-term Path Search** - Filter "auth login" now matches files in auth/ directories
+3. **Syntax Highlighting** - Preview pane highlights YAML keys (blue), headers (yellow), comments (gray)
+4. **Extended Keyboard Nav** - Added Ctrl+N/P, Ctrl+J/K, Tab for edit
+5. **Half-page Scrolling** - Ctrl+U/D now scroll half-page instead of 5 lines
+6. **Inverse Video Selection** - Selected row uses full-width inverse video instead of `>` pointer
+7. **Empty State** - Shows helpful message when filter has no matches
+8. **Styled Help Footer** - Keys shown with inverse video badges for discoverability
+
+---
+
+## src/file-selector.ts
+
+```ts
 /**
  * Interactive file selector with split-pane preview
  * Provides file preview, path display, and fuzzy filtering
@@ -120,31 +143,7 @@ function fitToWidth(str: string, width: number): string {
 }
 
 /**
- * Simple syntax highlighting for Markdown/YAML frontmatter
- */
-function highlightSyntax(line: string): string {
-  const trimmed = line.trim();
-  // YAML frontmatter delimiter
-  if (trimmed === "---") {
-    return `\x1b[90m${line}\x1b[0m`;
-  }
-  // YAML Keys (e.g. "model: value")
-  if (/^[\w_-]+:/.test(trimmed)) {
-    return line.replace(/^([\w_-]+:)(.*)/, "\x1b[34m$1\x1b[0m$2");
-  }
-  // Markdown Headers (# Header)
-  if (trimmed.startsWith("#")) {
-    return `\x1b[1m\x1b[33m${line}\x1b[0m`;
-  }
-  // Comments
-  if (trimmed.startsWith("//") || trimmed.startsWith("# ")) {
-    return `\x1b[90m${line}\x1b[0m`;
-  }
-  return line;
-}
-
-/**
- * Format preview content with line numbers and syntax highlighting
+ * Format preview content with line numbers
  */
 function formatPreviewContent(
   content: string,
@@ -166,14 +165,10 @@ function formatPreviewContent(
   const formattedLines = visibleLines.map((line, idx) => {
     const lineNum = startLine + idx + 1;
     const lineNumStr = String(lineNum).padStart(lineNumWidth, " ");
-    // Apply syntax highlighting before truncation
-    const highlighted = highlightSyntax(line);
-    // Truncate if too long (fitToWidth handles ANSI codes)
+    // Truncate line if too long
     const displayLine =
-      stripAnsi(highlighted).length > contentWidth
-        ? fitToWidth(highlighted, contentWidth - 1) + "~"
-        : highlighted;
-    return `\x1b[90m${lineNumStr} │\x1b[0m ${displayLine}`;
+      line.length > contentWidth ? line.slice(0, contentWidth - 1) + "~" : line;
+    return `\x1b[90m${lineNumStr}\x1b[0m\x1b[90m|\x1b[0m ${displayLine}`;
   });
 
   // Pad with empty lines if content is shorter than preview height
@@ -185,34 +180,20 @@ function formatPreviewContent(
 }
 
 /**
- * Score a file against a filter.
- * Higher = better match. 0 = no match.
- * 100 = Exact name, 80 = Starts with, 60 = Contains name, 40 = Path match
+ * Fuzzy match a filter against a filename
  */
-function getMatchScore(filter: string, file: AgentFile): number {
-  if (!filter) return 1;
-  const search = filter.toLowerCase();
-  const name = file.name.toLowerCase();
-  const path = file.path.toLowerCase();
+function fuzzyMatch(filter: string, text: string): boolean {
+  const lowerFilter = filter.toLowerCase();
+  const lowerText = text.toLowerCase();
 
-  if (name === search) return 100;
-  if (name.startsWith(search)) return 80;
-  if (name.includes(search)) return 60;
-
-  // Multi-term path search (e.g. "auth login")
-  const terms = search.split(/\s+/);
-  if (terms.every((t) => path.includes(t))) return 40;
-
-  // Fuzzy match as fallback (all chars in order)
+  // Check if all filter chars appear in order
   let filterIdx = 0;
-  for (let i = 0; i < name.length && filterIdx < search.length; i++) {
-    if (name[i] === search[filterIdx]) {
+  for (let i = 0; i < lowerText.length && filterIdx < lowerFilter.length; i++) {
+    if (lowerText[i] === lowerFilter[filterIdx]) {
       filterIdx++;
     }
   }
-  if (filterIdx === search.length) return 20;
-
-  return 0;
+  return filterIdx === lowerFilter.length;
 }
 
 /**
@@ -260,13 +241,9 @@ export const fileSelector = createPrompt<FileSelectorResult, FileSelectorConfig>
     const [filter, setFilter] = useState("");
     const [previewScroll, setPreviewScroll] = useState(0);
 
-    // Filter and sort files by match score (best matches first)
+    // Filter files based on current filter
     const filteredFiles = filter
-      ? files
-          .map((f) => ({ file: f, score: getMatchScore(filter, f) }))
-          .filter((x) => x.score > 0)
-          .sort((a, b) => b.score - a.score)
-          .map((x) => x.file)
+      ? files.filter((f) => fuzzyMatch(filter, f.name))
       : files;
 
     // Ensure cursor is within bounds
@@ -274,17 +251,6 @@ export const fileSelector = createPrompt<FileSelectorResult, FileSelectorConfig>
 
     // Reset preview scroll when cursor changes
     const currentFile = filteredFiles[effectiveCursor];
-
-    // Calculate layout dimensions early (needed for scroll step)
-    const termWidth = getTerminalWidth();
-    const termHeight = getTerminalHeight();
-    const listWidth = Math.floor(termWidth * 0.35);
-    const separatorWidth = 3;
-    const previewWidth = termWidth - listWidth - separatorWidth - 2;
-    const contentHeight = Math.min(pageSize, termHeight - 6);
-
-    // Half-page scroll step for vim-style scrolling
-    const scrollStep = Math.max(1, Math.floor(contentHeight / 2));
 
     useKeypress((key, rl) => {
       const extKey = key as ExtendedKeyEvent;
@@ -295,40 +261,34 @@ export const fileSelector = createPrompt<FileSelectorResult, FileSelectorConfig>
         return;
       }
 
-      // Tab or Ctrl+E to edit the file in $EDITOR
-      if (key.name === "tab" || (key.ctrl && key.name === "e")) {
+      // Ctrl+E to edit the file in $EDITOR
+      if (key.ctrl && key.name === "e") {
         if (currentFile) {
           done({ action: "edit", path: currentFile.path });
         }
         return;
       }
 
-      // Unified navigation: Arrows + Emacs (Ctrl+N/P) + Vim (Ctrl+J/K)
-      const isNavUp =
-        isUpKey(key) || (key.ctrl && (key.name === "p" || key.name === "k"));
-      const isNavDown =
-        isDownKey(key) || (key.ctrl && (key.name === "n" || key.name === "j"));
-
-      if (isNavUp) {
+      if (isUpKey(key)) {
         setCursor(Math.max(0, effectiveCursor - 1));
         setPreviewScroll(0);
         return;
       }
 
-      if (isNavDown) {
+      if (isDownKey(key)) {
         setCursor(Math.min(filteredFiles.length - 1, effectiveCursor + 1));
         setPreviewScroll(0);
         return;
       }
 
-      // Vim-style half-page preview scrolling (Ctrl+U / Ctrl+D)
+      // Page up/down for preview scrolling
       if (key.name === "pageup" || (key.ctrl && key.name === "u")) {
-        setPreviewScroll(Math.max(0, previewScroll - scrollStep));
+        setPreviewScroll(Math.max(0, previewScroll - 5));
         return;
       }
 
       if (key.name === "pagedown" || (key.ctrl && key.name === "d")) {
-        setPreviewScroll(previewScroll + scrollStep);
+        setPreviewScroll(previewScroll + 5);
         return;
       }
 
@@ -350,16 +310,24 @@ export const fileSelector = createPrompt<FileSelectorResult, FileSelectorConfig>
         return;
       }
 
-      // Add character to filter (printable characters only, including space for path search)
+      // Add character to filter (printable characters only)
       if (extKey.sequence && extKey.sequence.length === 1 && !extKey.ctrl && !extKey.meta) {
         const char = extKey.sequence;
-        if (char.match(/[\w\-\.\s]/)) {
+        if (char.match(/[\w\-\.]/)) {
           setFilter(filter + char);
           setCursor(0);
           setPreviewScroll(0);
         }
       }
     });
+
+    // Calculate layout dimensions
+    const termWidth = getTerminalWidth();
+    const termHeight = getTerminalHeight();
+    const listWidth = Math.floor(termWidth * 0.35);
+    const separatorWidth = 3;
+    const previewWidth = termWidth - listWidth - separatorWidth - 2;
+    const contentHeight = Math.min(pageSize, termHeight - 6);
 
     // Build file list with pagination
     const startIdx = Math.max(
@@ -370,42 +338,26 @@ export const fileSelector = createPrompt<FileSelectorResult, FileSelectorConfig>
 
     const listLines: string[] = [];
 
-    // Handle empty state
-    if (filteredFiles.length === 0 && filter) {
-      listLines.push("");
-      listLines.push(`  \x1b[33mNo matches for "${filter}"\x1b[0m`);
-      listLines.push(`  \x1b[90mTry fewer characters or path terms\x1b[0m`);
-      while (listLines.length < contentHeight) {
+    for (let i = 0; i < contentHeight; i++) {
+      const file = visibleFiles[i];
+      if (!file) {
         listLines.push("");
+        continue;
       }
-    } else {
-      // Inverse video helper: \x1b[7m = inverse, \x1b[27m = reset inverse
-      const inverse = (str: string) => `\x1b[7m${str}\x1b[27m`;
 
-      for (let i = 0; i < contentHeight; i++) {
-        const file = visibleFiles[i];
-        if (!file) {
-          listLines.push("");
-          continue;
-        }
+      const fileIdx = startIdx + i;
+      const isSelected = fileIdx === effectiveCursor;
+      const pointer = isSelected ? "\x1b[36m>\x1b[0m" : " ";
+      const name = highlightMatch(filter, file.name);
+      const source =
+        file.source === "cwd"
+          ? ""
+          : ` \x1b[90m(${file.source})\x1b[0m`;
 
-        const fileIdx = startIdx + i;
-        const isSelected = fileIdx === effectiveCursor;
-        const name = highlightMatch(filter, file.name);
-        const source =
-          file.source === "cwd" ? "" : ` (${file.source})`;
-
-        // Build line content
-        const lineContent = ` ${stripAnsi(file.name)}${source}`;
-        const rawLen = lineContent.length;
-        const padding = " ".repeat(Math.max(0, listWidth - rawLen));
-
-        if (isSelected) {
-          // Use inverse video for selected row (full-width highlight)
-          listLines.push(inverse(`${lineContent}${padding}`));
-        } else {
-          listLines.push(` ${name}\x1b[90m${source}\x1b[0m`);
-        }
+      if (isSelected) {
+        listLines.push(`${pointer} \x1b[1m${name}\x1b[0m${source}`);
+      } else {
+        listLines.push(`${pointer} ${name}${source}`);
       }
     }
 
@@ -468,11 +420,10 @@ export const fileSelector = createPrompt<FileSelectorResult, FileSelectorConfig>
       outputLines.push(`${listLine}${separator}${previewLine}`);
     }
 
-    // Help line with styled keys (inverse video for keys)
-    const k = (t: string) => `\x1b[7m ${t} \x1b[27m`;
+    // Help line
     outputLines.push("");
     outputLines.push(
-      `${k("↑↓")} Nav  ${k("Enter")} Run  ${k("Tab")} Edit  ${k("^U/D")} Scroll  ${k("Esc")} Clear`
+      `\x1b[90m↑↓ navigate  PgUp/PgDn scroll preview  Enter run  Ctrl+E edit  Esc clear filter\x1b[0m`
     );
 
     return outputLines.join("\n");
@@ -563,3 +514,46 @@ export async function showFileSelectorWithPreview(
     }
   }
 }
+
+```
+
+---
+
+## UX Review Questions
+
+### Keyboard Navigation
+- Are shortcuts intuitive? (`↑↓` navigate, `Enter` run, `Ctrl+E` edit, `Esc` clear, `PgUp/PgDn` scroll)
+- Add vim-style `j/k` navigation?
+- Is `Ctrl+E` discoverable? Should `Tab` toggle focus?
+
+### Visual Design
+- Is 35%/65% split optimal?
+- Colors: cyan selection, gray metadata, blue paths - appropriate?
+- Background highlight vs bold for selection?
+
+### Filter Behavior
+- Filter matches filename only - search paths/content too?
+- Fuzzy = sequential chars only - right algorithm?
+- Show cursor in filter input? Empty result state?
+
+### Preview Pane
+- Line numbers helpful or clutter?
+- Add syntax highlighting for YAML frontmatter?
+- Auto-scroll to show frontmatter first?
+
+### Discoverability
+- Is bottom help line sufficient?
+- Add `?` key for detailed help?
+- Make source indicators more prominent?
+
+---
+
+## Instructions For Expert
+
+Analyze this code and provide **specific, actionable UX improvements** with code snippets. Focus on:
+1. Keyboard patterns (compare to fzf, lazygit)
+2. Visual hierarchy and accessibility
+3. Filter/search UX
+4. Empty states and error handling
+
+Provide before/after code for each suggestion.

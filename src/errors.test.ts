@@ -284,9 +284,9 @@ describe("Runtime Error Integration", () => {
   });
 
   describe("TemplateError", () => {
-    it("is thrown for missing template variables", async () => {
+    it("is thrown for missing underscore-prefixed template variables", async () => {
       const filePath = join(tempDir, "missing-var.claude.md");
-      await writeFile(filePath, `---\n---\nHello {{ name }}!`);
+      await writeFile(filePath, `---\n---\nHello {{ _name }}!`);
 
       const runtime = createRuntime();
       const resolved = await runtime.resolve(filePath);
@@ -295,9 +295,9 @@ describe("Runtime Error Integration", () => {
       await expect(runtime.processTemplate(context)).rejects.toThrow(TemplateError);
     });
 
-    it("lists missing variables in message", async () => {
+    it("lists missing underscore-prefixed variables in message", async () => {
       const filePath = join(tempDir, "vars.claude.md");
-      await writeFile(filePath, `---\n---\n{{ foo }} and {{ bar }}`);
+      await writeFile(filePath, `---\n---\n{{ _foo }} and {{ _bar }}`);
 
       const runtime = createRuntime();
       const resolved = await runtime.resolve(filePath);
@@ -309,8 +309,8 @@ describe("Runtime Error Integration", () => {
       } catch (err) {
         expect(err).toBeInstanceOf(TemplateError);
         const message = (err as TemplateError).message;
-        expect(message).toContain("foo");
-        expect(message).toContain("bar");
+        expect(message).toContain("_foo");
+        expect(message).toContain("_bar");
       }
     });
   });
@@ -424,7 +424,7 @@ describe("Error Type Assertions in Tests", () => {
 
       // TemplateError
       const filePath2 = join(tempDir, "missingvar.claude.md");
-      await writeFile(filePath2, `---\n---\nHello {{ name }}`);
+      await writeFile(filePath2, `---\n---\nHello {{ _name }}`);
       const runtime3 = createRuntime();
       const resolved2 = await runtime3.resolve(filePath2);
       const context = await runtime3.buildContext(resolved2);

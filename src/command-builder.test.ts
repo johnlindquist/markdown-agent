@@ -129,13 +129,13 @@ describe("buildArgsFromFrontmatter", () => {
   });
 
   describe("system keys (skipped)", () => {
-    it("skips args key", () => {
+    it("skips _inputs key", () => {
       const result = buildArgsFromFrontmatter(
-        { args: ["message", "branch"], model: "opus" },
+        { _inputs: ["message", "branch"], model: "opus" },
         new Set()
       );
       expect(result).toEqual(["--model", "opus"]);
-      expect(result).not.toContain("--args");
+      expect(result).not.toContain("--_inputs");
     });
 
     it("skips pre/before lifecycle hooks", () => {
@@ -252,16 +252,16 @@ describe("buildArgsFromFrontmatter", () => {
     });
   });
 
-  describe("env key handling", () => {
-    it("skips env when it is an object (process.env config)", () => {
+  describe("object values", () => {
+    it("skips object values (they don't map to CLI flags)", () => {
       const result = buildArgsFromFrontmatter(
-        { env: { HOST: "localhost" }, model: "opus" },
+        { config: { key: "value" }, model: "opus" },
         new Set()
       );
       expect(result).toEqual(["--model", "opus"]);
     });
 
-    it("passes env as --env flags when it is an array", () => {
+    it("passes array values as repeated flags", () => {
       const result = buildArgsFromFrontmatter(
         { env: ["HOST=localhost", "PORT=3000"] },
         new Set()
@@ -272,7 +272,7 @@ describe("buildArgsFromFrontmatter", () => {
       ]);
     });
 
-    it("passes env as --env flag when it is a string", () => {
+    it("passes string values as flag with value", () => {
       const result = buildArgsFromFrontmatter(
         { env: "HOST=localhost" },
         new Set()
@@ -375,36 +375,22 @@ describe("extractPositionalMappings", () => {
 });
 
 describe("extractEnvVars", () => {
-  it("extracts object form of env", () => {
+  it("extracts _env object", () => {
     const env = extractEnvVars({
-      env: { HOST: "localhost", PORT: "3000" },
+      _env: { HOST: "localhost", PORT: "3000" },
     });
     expect(env).toEqual({ HOST: "localhost", PORT: "3000" });
   });
 
-  it("returns empty object for array form", () => {
-    const env = extractEnvVars({
-      env: ["HOST=localhost"],
-    });
-    expect(env).toEqual({});
-  });
-
-  it("returns empty object for string form", () => {
-    const env = extractEnvVars({
-      env: "HOST=localhost",
-    });
-    expect(env).toEqual({});
-  });
-
-  it("returns empty object when no env", () => {
+  it("returns empty object when no _env", () => {
     const env = extractEnvVars({
       model: "opus",
     });
     expect(env).toEqual({});
   });
 
-  it("handles empty env object", () => {
-    const env = extractEnvVars({ env: {} });
+  it("handles empty _env object", () => {
+    const env = extractEnvVars({ _env: {} });
     expect(env).toEqual({});
   });
 });
@@ -570,7 +556,7 @@ describe("buildCommand", () => {
   it("extracts env vars from frontmatter", () => {
     const result = buildCommand(
       "claude",
-      { env: { API_KEY: "secret", DEBUG: "true" } },
+      { _env: { API_KEY: "secret", DEBUG: "true" } },
       "body",
       [],
       new Set(),
@@ -654,8 +640,8 @@ describe("buildCommand", () => {
       debug: false,
       "add-dir": ["./src", "./tests"],
       $1: "prompt",
-      env: { NODE_ENV: "test" },
-      args: ["message"],
+      _env: { NODE_ENV: "test" },
+      _inputs: ["message"],
     };
 
     const result = buildCommand(
@@ -683,7 +669,7 @@ describe("buildCommand", () => {
 
     expect(result.env).toEqual({ NODE_ENV: "test" });
     // System keys should not appear
-    expect(result.args).not.toContain("--args");
+    expect(result.args).not.toContain("--_inputs");
     expect(result.args).not.toContain("--$1");
   });
 
@@ -779,7 +765,7 @@ describe("buildCommandBase", () => {
   it("extracts env vars", () => {
     const result = buildCommandBase(
       "claude",
-      { env: { KEY: "value" } },
+      { _env: { KEY: "value" } },
       new Set(),
       emptyConfig,
       cwd
@@ -1041,7 +1027,7 @@ describe("integration scenarios", () => {
     const result = buildCommand(
       "claude",
       {
-        env: { ANTHROPIC_API_KEY: "sk-test", DEBUG: "1" },
+        _env: { ANTHROPIC_API_KEY: "sk-test", DEBUG: "1" },
         model: "opus",
       },
       "body",
@@ -1062,29 +1048,29 @@ describe("integration scenarios", () => {
   });
 
   it("template variable substitution workflow", () => {
-    // Simulates: {{ target }} in body, target provided via args
-    const templateVars = new Set(["target"]);
+    // Simulates: {{ _target }} in body, _target provided via _inputs
+    const templateVars = new Set(["_target"]);
 
     const result = buildCommand(
       "claude",
       {
-        args: ["target"],  // Declares template var (skipped)
-        target: "src/app.ts",  // Template var value (skipped)
+        _inputs: ["_target"],  // Declares template var (skipped)
+        _target: "src/app.ts",  // Template var value (skipped)
         model: "opus",
       },
-      "Review {{ target }}",  // Body with template (already substituted upstream)
+      "Review {{ _target }}",  // Body with template (already substituted upstream)
       [],
       templateVars,
       {},
       "/project"
     );
 
-    // target should not appear as a flag
+    // _target should not appear as a flag
     const spawnArgs = getSpawnArgs(result);
-    expect(spawnArgs).not.toContain("--target");
+    expect(spawnArgs).not.toContain("--_target");
     expect(spawnArgs).not.toContain("src/app.ts");
-    // args system key should not appear
-    expect(spawnArgs).not.toContain("--args");
+    // _inputs system key should not appear
+    expect(spawnArgs).not.toContain("--_inputs");
     // model should appear
     expect(spawnArgs).toContain("--model");
     expect(spawnArgs).toContain("opus");
@@ -1193,7 +1179,7 @@ describe("dry-run consistency guarantee", () => {
       "add-dir": ["./src", "./tests"],
       $1: "prompt",
       _subcommand: "chat",
-      env: { API_KEY: "secret" },
+      _env: { API_KEY: "secret" },
     };
 
     const spec = buildCommand(
@@ -1222,7 +1208,7 @@ describe("dry-run consistency guarantee", () => {
     expect(addDirCount).toBe(2);
     expect(display.split("--add-dir").length - 1).toBe(2);
 
-    // Verify env is separate (not in args)
+    // Verify _env is separate (not in args)
     expect(spawnArgs).not.toContain("API_KEY");
     expect(display).not.toContain("API_KEY");
     expect(spec.env).toEqual({ API_KEY: "secret" });

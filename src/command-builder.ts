@@ -40,15 +40,17 @@ export function getSpawnArgs(spec: CommandSpec): string[] {
 
 /**
  * Keys handled by the system, not passed to the command
- * - args: consumed for template variable mapping
- * - env (when object): sets process.env, not passed as flag
+ * - _inputs: consumed for template variable mapping
+ * - _env: sets process.env, not passed as flag
  * - $N patterns: positional mapping, handled specially
  * - pre/before: lifecycle hooks
  * - post/after: lifecycle hooks
  * - context_window: token limit override
+ * Note: All underscore-prefixed keys are also skipped in buildArgsFromFrontmatter
  */
 const SYSTEM_KEYS = new Set([
-  "args",
+  "_inputs",
+  "_env",
   "pre",
   "before",
   "post",
@@ -104,13 +106,9 @@ export function buildArgsFromFrontmatter(
     // Skip template variables (used for substitution, not passed to command)
     if (templateVars.has(key)) continue;
 
-    // Handle polymorphic env key
-    if (key === "env") {
-      // Object form: sets process.env, skip here
-      if (typeof value === "object" && value !== null && !Array.isArray(value)) {
-        continue;
-      }
-      // Array/string form: pass as --env flags (fall through)
+    // Skip objects (except arrays) - they don't map cleanly to CLI flags
+    if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+      continue;
     }
 
     // Skip undefined/null/false
@@ -155,10 +153,10 @@ export function extractPositionalMappings(frontmatter: AgentFrontmatter): Map<nu
 }
 
 /**
- * Extract environment variables to set (from object form of env)
+ * Extract environment variables to set (from _env object)
  */
 export function extractEnvVars(frontmatter: AgentFrontmatter): Record<string, string> {
-  const env = frontmatter.env;
+  const env = frontmatter._env;
   if (typeof env === "object" && env !== null && !Array.isArray(env)) {
     return env as Record<string, string>;
   }

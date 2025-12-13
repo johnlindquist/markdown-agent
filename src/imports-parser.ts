@@ -40,7 +40,7 @@ export function findSafeRanges(content: string): Array<{ start: number; end: num
     if (context === 'normal') {
       // Check for fenced code block start (3+ backticks or tildes)
       if (content[i] === '`' || content[i] === '~') {
-        const char = content[i];
+        const char = content[i]!; // Safe: already checked above
         let len = 0;
         let j = i;
         while (j < content.length && content[j] === char) {
@@ -284,7 +284,7 @@ export function parseImports(content: string): ImportAction[] {
   // This prevents execution of fences nested inside documentation blocks.
   const unsafeStarts = new Set<number>();
   if (safeRanges.length > 0) {
-    if (safeRanges[0].start > 0) unsafeStarts.add(0);
+    if (safeRanges[0]!.start > 0) unsafeStarts.add(0);
     for (const range of safeRanges) {
       if (range.end < content.length) {
         unsafeStarts.add(range.end);
@@ -346,7 +346,7 @@ export function parseImports(content: string): ImportAction[] {
     // Only process if the match aligns exactly with a known code block start
     if (unsafeStarts.has(match.index)) {
       const [fullMatch, fence, infoString, shebang, code] = match;
-      const language = infoString.trim().split(/\s+/)[0]; // Extract first word as language
+      const language = (infoString ?? '').trim().split(/\s+/)[0] ?? ''; // Extract first word as language
 
       if (shebang && code !== undefined) {
         const action: ExecutableCodeFenceAction = {

@@ -56,9 +56,9 @@ describe("buildArgs", () => {
     expect(result).toEqual(["--add-dir", "./src", "--add-dir", "./tests"]);
   });
 
-  test("skips system keys (args)", () => {
+  test("skips system keys (_inputs)", () => {
     const result = buildArgs({
-      args: ["message", "branch"],
+      _inputs: ["message", "branch"],
       model: "opus",
     }, new Set());
     expect(result).toEqual(["--model", "opus"]);
@@ -73,36 +73,20 @@ describe("buildArgs", () => {
     expect(result).toEqual(["--verbose"]);
   });
 
-  test("skips env when it is an object (process.env config)", () => {
+  test("skips _env (sets process.env)", () => {
     const result = buildArgs({
-      env: { HOST: "localhost" },
+      _env: { HOST: "localhost" },
       model: "opus",
     }, new Set());
     expect(result).toEqual(["--model", "opus"]);
   });
 
-  test("passes env as --env flags when it is an array", () => {
+  test("skips context_window (system key)", () => {
     const result = buildArgs({
-      env: ["HOST=localhost", "PORT=3000"],
+      context_window: 100000,
       model: "opus",
     }, new Set());
-    // Order depends on object key enumeration
-    expect(result).toContain("--env");
-    expect(result).toContain("HOST=localhost");
-    expect(result).toContain("PORT=3000");
-    expect(result).toContain("--model");
-    expect(result).toContain("opus");
-  });
-
-  test("passes env as --env flag when it is a string", () => {
-    const result = buildArgs({
-      env: "HOST=localhost",
-      model: "opus",
-    }, new Set());
-    expect(result).toContain("--env");
-    expect(result).toContain("HOST=localhost");
-    expect(result).toContain("--model");
-    expect(result).toContain("opus");
+    expect(result).toEqual(["--model", "opus"]);
   });
 
   test("skips template variables", () => {
@@ -141,28 +125,14 @@ describe("extractPositionalMappings", () => {
 });
 
 describe("extractEnvVars", () => {
-  test("extracts object form of env", () => {
+  test("extracts _env object", () => {
     const env = extractEnvVars({
-      env: { HOST: "localhost", PORT: "3000" },
+      _env: { HOST: "localhost", PORT: "3000" },
     });
     expect(env).toEqual({ HOST: "localhost", PORT: "3000" });
   });
 
-  test("returns undefined for array form", () => {
-    const env = extractEnvVars({
-      env: ["HOST=localhost"],
-    });
-    expect(env).toBeUndefined();
-  });
-
-  test("returns undefined for string form", () => {
-    const env = extractEnvVars({
-      env: "HOST=localhost",
-    });
-    expect(env).toBeUndefined();
-  });
-
-  test("returns undefined when no env", () => {
+  test("returns undefined when no _env", () => {
     const env = extractEnvVars({
       model: "opus",
     });

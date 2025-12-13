@@ -4,18 +4,21 @@ import { substituteTemplateVars, extractTemplateVars } from "./template";
 import { resolveCommand } from "./command";
 
 /**
- * Tests for the args system:
- * - args: [varname] in frontmatter defines positional arguments
+ * Tests for the _inputs system:
+ * - _inputs: [varname] in frontmatter defines positional arguments
  * - CLI positional args fill template variables in the body
- * - {{ varname }} in body gets replaced with the CLI arg value
+ * - {{ _varname }} in body gets replaced with the CLI arg value
+ *
+ * Note: Template variables must use underscore prefix (e.g., {{ _name }})
+ * to be detected and prompted for. Non-underscore variables pass through as-is.
  */
 
-describe("args positional argument flow", () => {
-  test("args field defines template variables consumed from CLI", () => {
+describe("_inputs positional argument flow", () => {
+  test("_inputs field defines template variables consumed from CLI", () => {
     const content = `---
-args: [message]
+_inputs: [_message]
 ---
-Say: {{ message }}`;
+Say: {{ _message }}`;
 
     const { frontmatter, body } = parseFrontmatter(content);
 
@@ -24,9 +27,9 @@ Say: {{ message }}`;
     const templateVars: Record<string, string> = {};
 
     // Consume positional args (same logic as index.ts)
-    if (frontmatter.args && Array.isArray(frontmatter.args)) {
-      for (let i = 0; i < frontmatter.args.length; i++) {
-        const argName = frontmatter.args[i];
+    if (frontmatter._inputs && Array.isArray(frontmatter._inputs)) {
+      for (let i = 0; i < frontmatter._inputs.length; i++) {
+        const argName = frontmatter._inputs[i];
         const cliValue = cliArgs[i];
         if (i < cliArgs.length && argName && cliValue !== undefined) {
           templateVars[argName] = cliValue;
@@ -34,18 +37,18 @@ Say: {{ message }}`;
       }
     }
 
-    expect(templateVars).toEqual({ message: "Hello World" });
+    expect(templateVars).toEqual({ _message: "Hello World" });
 
     // Apply substitution
     const result = substituteTemplateVars(body, templateVars);
     expect(result).toBe("Say: Hello World");
   });
 
-  test("multiple args consume multiple positional CLI arguments", () => {
+  test("multiple _inputs consume multiple positional CLI arguments", () => {
     const content = `---
-args: [name, action]
+_inputs: [_name, _action]
 ---
-{{ name }} will {{ action }}`;
+{{ _name }} will {{ _action }}`;
 
     const { frontmatter, body } = parseFrontmatter(content);
 
@@ -53,9 +56,9 @@ args: [name, action]
     const cliArgs = ["Alice", "run"];
     const templateVars: Record<string, string> = {};
 
-    if (frontmatter.args && Array.isArray(frontmatter.args)) {
-      for (let i = 0; i < frontmatter.args.length; i++) {
-        const argName = frontmatter.args[i];
+    if (frontmatter._inputs && Array.isArray(frontmatter._inputs)) {
+      for (let i = 0; i < frontmatter._inputs.length; i++) {
+        const argName = frontmatter._inputs[i];
         const cliValue = cliArgs[i];
         if (i < cliArgs.length && argName && cliValue !== undefined) {
           templateVars[argName] = cliValue;
@@ -63,7 +66,7 @@ args: [name, action]
       }
     }
 
-    expect(templateVars).toEqual({ name: "Alice", action: "run" });
+    expect(templateVars).toEqual({ _name: "Alice", _action: "run" });
 
     const result = substituteTemplateVars(body, templateVars);
     expect(result).toBe("Alice will run");
@@ -71,9 +74,9 @@ args: [name, action]
 
   test("body consisting only of template var becomes the CLI arg", () => {
     const content = `---
-args: [prompt]
+_inputs: [_prompt]
 ---
-{{ prompt }}`;
+{{ _prompt }}`;
 
     const { frontmatter, body } = parseFrontmatter(content);
 
@@ -81,9 +84,9 @@ args: [prompt]
     const cliArgs = ["Write me a haiku about coding"];
     const templateVars: Record<string, string> = {};
 
-    if (frontmatter.args && Array.isArray(frontmatter.args)) {
-      for (let i = 0; i < frontmatter.args.length; i++) {
-        const argName = frontmatter.args[i];
+    if (frontmatter._inputs && Array.isArray(frontmatter._inputs)) {
+      for (let i = 0; i < frontmatter._inputs.length; i++) {
+        const argName = frontmatter._inputs[i];
         const cliValue = cliArgs[i];
         if (i < cliArgs.length && argName && cliValue !== undefined) {
           templateVars[argName] = cliValue;
@@ -95,33 +98,42 @@ args: [prompt]
     expect(result).toBe("Write me a haiku about coding");
   });
 
-  test("missing template variables are detected", () => {
-    const body = "Hello {{ name }}, welcome to {{ place }}";
+  test("missing underscore template variables are detected", () => {
+    const body = "Hello {{ _name }}, welcome to {{ _place }}";
     const requiredVars = extractTemplateVars(body);
 
-    expect(requiredVars).toContain("name");
-    expect(requiredVars).toContain("place");
+    expect(requiredVars).toContain("_name");
+    expect(requiredVars).toContain("_place");
 
     // If only one is provided, the other is "missing"
-    const templateVars = { name: "Alice" };
-    const missingVars = requiredVars.filter(v => !(v in templateVars));
+    const templateVars = { _name: "Alice" };
+    const missingVars = requiredVars.filter((v) => !(v in templateVars));
 
-    expect(missingVars).toEqual(["place"]);
+    expect(missingVars).toEqual(["_place"]);
+  });
+
+  test("non-underscore variables are not detected as missing", () => {
+    const body = "Hello {{ name }}, welcome to {{ _place }}";
+    const requiredVars = extractTemplateVars(body);
+
+    // Only _place is detected (name is not underscore-prefixed)
+    expect(requiredVars).toEqual(["_place"]);
   });
 });
 
 describe("$varname fields with defaults", () => {
   test("$varname field with default value", () => {
     const content = `---
-$feature_name: Authentication
+$_feature_name: Authentication
 ---
-Build {{ feature_name }}`;
+Build {{ _feature_name }}`;
 
     const { frontmatter, body } = parseFrontmatter(content);
 
     // Extract $varname fields
-    const namedVarFields = Object.keys(frontmatter)
-      .filter(key => key.startsWith("$") && !/^\$\d+$/.test(key));
+    const namedVarFields = Object.keys(frontmatter).filter(
+      (key) => key.startsWith("$") && !/^\$\d+$/.test(key)
+    );
 
     const templateVars: Record<string, string> = {};
 
@@ -129,12 +141,16 @@ Build {{ feature_name }}`;
     for (const key of namedVarFields) {
       const varName = key.slice(1);
       const defaultValue = frontmatter[key];
-      if (defaultValue !== undefined && defaultValue !== null && defaultValue !== "") {
+      if (
+        defaultValue !== undefined &&
+        defaultValue !== null &&
+        defaultValue !== ""
+      ) {
         templateVars[varName] = String(defaultValue);
       }
     }
 
-    expect(templateVars).toEqual({ feature_name: "Authentication" });
+    expect(templateVars).toEqual({ _feature_name: "Authentication" });
 
     const result = substituteTemplateVars(body, templateVars);
     expect(result).toBe("Build Authentication");
@@ -142,17 +158,18 @@ Build {{ feature_name }}`;
 
   test("CLI flag overrides $varname default", () => {
     const content = `---
-$feature_name: Authentication
+$_feature_name: Authentication
 ---
-Build {{ feature_name }}`;
+Build {{ _feature_name }}`;
 
     const { frontmatter, body } = parseFrontmatter(content);
 
-    // Simulate CLI: md file.md --feature_name "Payments"
-    const cliArgs = ["--feature_name", "Payments"];
+    // Simulate CLI: md file.md --_feature_name "Payments"
+    const cliArgs = ["--_feature_name", "Payments"];
 
-    const namedVarFields = Object.keys(frontmatter)
-      .filter(key => key.startsWith("$") && !/^\$\d+$/.test(key));
+    const namedVarFields = Object.keys(frontmatter).filter(
+      (key) => key.startsWith("$") && !/^\$\d+$/.test(key)
+    );
 
     const templateVars: Record<string, string> = {};
 
@@ -161,16 +178,20 @@ Build {{ feature_name }}`;
       const defaultValue = frontmatter[key];
 
       // Look for --varname in CLI args
-      const flagIndex = cliArgs.findIndex(arg => arg === `--${varName}`);
+      const flagIndex = cliArgs.findIndex((arg) => arg === `--${varName}`);
       const flagValue = flagIndex !== -1 ? cliArgs[flagIndex + 1] : undefined;
       if (flagValue !== undefined) {
         templateVars[varName] = flagValue;
-      } else if (defaultValue !== undefined && defaultValue !== null && defaultValue !== "") {
+      } else if (
+        defaultValue !== undefined &&
+        defaultValue !== null &&
+        defaultValue !== ""
+      ) {
         templateVars[varName] = String(defaultValue);
       }
     }
 
-    expect(templateVars).toEqual({ feature_name: "Payments" });
+    expect(templateVars).toEqual({ _feature_name: "Payments" });
 
     const result = substituteTemplateVars(body, templateVars);
     expect(result).toBe("Build Payments");
@@ -186,7 +207,9 @@ describe("flag hijacking", () => {
     let commandFromCli: string | undefined;
     const remainingArgs = [...cliArgs];
 
-    const commandFlagIndex = remainingArgs.findIndex(arg => arg === "--_command" || arg === "-_c");
+    const commandFlagIndex = remainingArgs.findIndex(
+      (arg) => arg === "--_command" || arg === "-_c"
+    );
     if (commandFlagIndex !== -1 && commandFlagIndex + 1 < remainingArgs.length) {
       commandFromCli = remainingArgs[commandFlagIndex + 1];
       remainingArgs.splice(commandFlagIndex, 2);
@@ -201,7 +224,9 @@ describe("flag hijacking", () => {
     const remainingArgs = [...cliArgs];
 
     let commandFromCli: string | undefined;
-    const commandFlagIndex = remainingArgs.findIndex(arg => arg === "--_command" || arg === "-_c");
+    const commandFlagIndex = remainingArgs.findIndex(
+      (arg) => arg === "--_command" || arg === "-_c"
+    );
     if (commandFlagIndex !== -1 && commandFlagIndex + 1 < remainingArgs.length) {
       commandFromCli = remainingArgs[commandFlagIndex + 1];
       remainingArgs.splice(commandFlagIndex, 2);

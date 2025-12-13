@@ -152,6 +152,11 @@ export interface ImportContext {
    * Instead, a placeholder message is returned showing what would have been executed.
    */
   dryRun?: boolean;
+  /**
+   * Content-only mode for 3-phase pipeline.
+   * When true, only expand file/url imports; leave commands for later.
+   */
+  _contentOnly?: boolean;
 }
 
 /**
@@ -844,6 +849,11 @@ async function processFileImport(
   const newStack = new Set(stack);
   newStack.add(canonicalPath);
 
+  // For 3-phase pipeline: if in content-only mode, skip commands in recursive imports
+  if (importCtx?._contentOnly) {
+    return expandContentImports(content, dirname(resolvedPath), newStack, verbose, importCtx);
+  }
+
   return expandImports(content, dirname(resolvedPath), newStack, verbose, importCtx);
 }
 
@@ -1324,4 +1334,167 @@ export async function expandImports(
 export function hasImports(content: string): boolean {
   // Use context-aware checker from parser which now includes code fences
   return hasImportsInContent(content);
+}
+
+// ============================================================================
+// 3-Phase Import Pipeline
+// ============================================================================
+// Enables LiquidJS template processing between file imports and command execution:
+// 1. expandContentImports() - Expands @file, @glob, @url, @symbol
+// 2. LiquidJS templates ({% capture %}, {{ var }}, etc.)
+// 3. expandCommandImports() - Expands !`commands` with resolved template vars
+
+/**
+ * Check if content has content imports (file, glob, url, symbol)
+ */
+export function hasContentImports(content: string): boolean {
+  const actions = parseImportsSafe(content);
+  return actions.some(a =>
+    a.type === 'file' || a.type === 'glob' || a.type === 'url' || a.type === 'symbol'
+  );
+}
+
+/**
+ * Check if content has command imports (commands, executable code fences)
+ */
+export function hasCommandImports(content: string): boolean {
+  const actions = parseImportsSafe(content);
+  return actions.some(a => a.type === 'command' || a.type === 'executable_code_fence');
+}
+
+/**
+ * Phase 1: Expand only content imports (file, glob, url, symbol)
+ * Leaves !`command` syntax untouched for Phase 3.
+ */
+export async function expandContentImports(
+  content: string,
+  currentFileDir: string,
+  stack: ImportStack = new Set(),
+  verbose: boolean = false,
+  importCtx?: ImportContext,
+  concurrencyLimit: number = DEFAULT_CONCURRENCY_LIMIT
+): Promise<string> {
+  const ctx: ImportContext = importCtx ?? {};
+  const tracker = ctx.resolvedImports;
+
+  const rawActions = parseImportsSafe(content);
+
+  // Filter to content imports only
+  const contentActions = rawActions.filter(a =>
+    a.type === 'file' || a.type === 'glob' || a.type === 'symbol' || a.type === 'url'
+  );
+
+  if (contentActions.length === 0) return content;
+
+  const semaphore = new Semaphore(concurrencyLimit);
+
+  const resolved = await Promise.all(
+    contentActions.map(async (action): Promise<ResolvedImportResult> => {
+      return semaphore.run(async () => {
+        let resolvedContent: string;
+        let parsed: ParsedImport;
+
+        if (action.type === 'file') {
+          let path = action.path;
+          if (action.lineRange) {
+            path = `${action.path}:${action.lineRange.start}-${action.lineRange.end}`;
+          }
+          parsed = { type: 'file', full: action.original, path, index: action.index };
+          const contentOnlyCtx: ImportContext = { ...ctx, _contentOnly: true };
+          resolvedContent = await processFileImport(path, currentFileDir, stack, verbose, contentOnlyCtx);
+        } else if (action.type === 'glob') {
+          parsed = { type: 'file', full: action.original, path: action.pattern, index: action.index };
+          const contentOnlyCtx: ImportContext = { ...ctx, _contentOnly: true };
+          resolvedContent = await processFileImport(action.pattern, currentFileDir, stack, verbose, contentOnlyCtx);
+        } else if (action.type === 'symbol') {
+          const path = `${action.path}#${action.symbol}`;
+          parsed = { type: 'file', full: action.original, path, index: action.index };
+          const contentOnlyCtx: ImportContext = { ...ctx, _contentOnly: true };
+          resolvedContent = await processFileImport(path, currentFileDir, stack, verbose, contentOnlyCtx);
+        } else {
+          // action.type === 'url'
+          parsed = { type: 'url', full: action.original, url: action.url, index: action.index };
+          resolvedContent = await processUrlImport(action.url, verbose);
+          if (tracker) tracker.push(action.url);
+        }
+
+        return { import: parsed, content: resolvedContent };
+      });
+    })
+  );
+
+  return injectResolvedImports(content, resolved);
+}
+
+/**
+ * Phase 3: Expand only command imports (!`commands` and executable code fences)
+ * Uses templateVars from LiquidJS processing for variable substitution in commands.
+ */
+export async function expandCommandImports(
+  content: string,
+  currentFileDir: string,
+  verbose: boolean = false,
+  importCtx?: ImportContext,
+  concurrencyLimit: number = DEFAULT_CONCURRENCY_LIMIT
+): Promise<string> {
+  const ctx: ImportContext = importCtx ?? {};
+
+  const rawActions = parseImportsSafe(content);
+
+  // Filter to command imports only
+  const cmdActions = rawActions.filter(a =>
+    a.type === 'command' || a.type === 'executable_code_fence'
+  );
+
+  if (cmdActions.length === 0) return content;
+
+  const semaphore = new Semaphore(concurrencyLimit);
+  const useDashboard = cmdActions.length > 0 && process.stderr.isTTY && !verbose;
+  const dashboard = useDashboard ? new ParallelDashboard() : null;
+
+  if (dashboard) dashboard.start();
+
+  try {
+    const resolved = await Promise.all(
+      cmdActions.map(async (action): Promise<ResolvedImportResult> => {
+        return semaphore.run(async () => {
+          let resolvedContent: string;
+          let parsed: ParsedImport;
+
+          if (action.type === 'command') {
+            parsed = { type: 'command', full: action.original, command: action.command, index: action.index };
+            const cmdId = Math.random().toString(36).substring(7);
+            if (dashboard) dashboard.register(cmdId, action.command);
+
+            try {
+              resolvedContent = await processCommandInline(
+                action.command, currentFileDir, verbose, ctx,
+                (chunk) => { if (dashboard) dashboard.update(cmdId, chunk); },
+                useDashboard
+              );
+            } finally {
+              if (dashboard) dashboard.finish(cmdId);
+            }
+          } else {
+            // action.type === 'executable_code_fence'
+            parsed = { type: 'executable_code_fence', full: action.original, action, index: action.index };
+            const fenceId = Math.random().toString(36).substring(7);
+            if (dashboard) dashboard.register(fenceId, `Code (${action.language})`);
+
+            try {
+              resolvedContent = await processExecutableCodeFence(action, currentFileDir, verbose, ctx);
+            } finally {
+              if (dashboard) dashboard.finish(fenceId);
+            }
+          }
+
+          return { import: parsed, content: resolvedContent };
+        });
+      })
+    );
+
+    return injectResolvedImports(content, resolved);
+  } finally {
+    if (dashboard) dashboard.stop();
+  }
 }

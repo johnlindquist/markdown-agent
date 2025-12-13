@@ -10,16 +10,12 @@ const stringCoerce = z.union([z.string(), z.number(), z.boolean()]).transform(v 
 
 /** Main frontmatter schema - minimal, passthrough everything else */
 export const frontmatterSchema = z.object({
-  // Named positional arguments
-  args: z.array(z.string()).optional(),
+  // Named positional arguments (underscore-prefixed system key)
+  _inputs: z.array(z.string()).optional(),
 
-  // Environment variables: Object (config) or Array/String (flag)
-  // Object values can be string, number, or boolean (coerced to string)
-  env: z.union([
-    z.record(z.string(), stringCoerce),
-    z.array(z.string()),
-    z.string()
-  ]).optional(),
+  // Environment variables (underscore-prefixed system key)
+  // Object form sets process.env
+  _env: z.record(z.string(), stringCoerce).optional(),
 }).passthrough(); // Allow all other keys - they become CLI flags (including $1, $2, etc.)
 
 /** Type inferred from schema */
