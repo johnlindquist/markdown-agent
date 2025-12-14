@@ -82,6 +82,13 @@ bun run md task.claude.md
 
 - **`logger.ts`** - Structured logging with pino (logs to `~/.mdflow/logs/<agent>/`)
 
+- **`history.ts`** - Frecency tracking and variable persistence
+  - `recordUsage()`: Track agent file usage for frecency sorting
+  - `getFrecencyScore()`: Calculate frecency score for a path
+  - `getVariableHistory()`: Get previous variable values for an agent
+  - `saveVariableValues()`: Save prompted variable values for future runs
+  - `getPreviousVariableValue()`: Get a specific variable's previous value
+
 ### Command Resolution
 
 Commands are resolved in priority order:
@@ -103,6 +110,8 @@ Commands are resolved in priority order:
 - `_cwd`: Override working directory for inline commands (`` !`cmd` ``)
 
 **Note:** `--_varname` CLI flags work without frontmatter declaration. If a `_` prefixed variable is used in the body but not provided, you'll be prompted for it.
+
+**Variable History:** When prompting for missing variables, previous values are shown as defaults (stored in `~/.mdflow/variable-history.json`). Press Enter to accept the previous value or type to override. Use `--_no-history` to skip loading/saving variable history.
 
 **All other keys** are passed directly as CLI flags:
 

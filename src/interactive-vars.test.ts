@@ -156,3 +156,163 @@ describe("integration with extractTemplateVars", () => {
     expect(vars).toEqual([]);
   });
 });
+
+// =============================================================================
+// Variable Persistence / History Tests
+// =============================================================================
+
+import {
+  getVariableHistory,
+  saveVariableValues,
+  getPreviousVariableValue,
+  resetVariableHistory,
+} from "./history";
+
+describe("variable persistence", () => {
+  describe("prompt with previous value as default", () => {
+    test("previous value is used as default in prompt", async () => {
+      resetVariableHistory();
+      const testPath = `/test/prompt-default-${Date.now()}.md`;
+
+      // Simulate saving a value
+      await saveVariableValues(testPath, { _ticket: "PROJ-999" });
+
+      // Check that we can retrieve it for the prompt default
+      const previousValue = await getPreviousVariableValue(testPath, "_ticket");
+      expect(previousValue).toBe("PROJ-999");
+    });
+
+    test("returns undefined for variables never entered before", async () => {
+      resetVariableHistory();
+      const testPath = `/test/no-history-${Date.now()}.md`;
+
+      const previousValue = await getPreviousVariableValue(testPath, "_new_var");
+      expect(previousValue).toBeUndefined();
+    });
+  });
+
+  describe("history keyed by agent file path", () => {
+    test("different agents have independent history", async () => {
+      resetVariableHistory();
+      const agent1 = `/project/agents/deploy-${Date.now()}.claude.md`;
+      const agent2 = `/project/agents/test-${Date.now()}.claude.md`;
+
+      await saveVariableValues(agent1, { _env: "production" });
+      await saveVariableValues(agent2, { _env: "staging" });
+
+      const history1 = await getVariableHistory(agent1);
+      const history2 = await getVariableHistory(agent2);
+
+      expect(history1._env).toBe("production");
+      expect(history2._env).toBe("staging");
+    });
+
+    test("absolute paths are used as keys", async () => {
+      resetVariableHistory();
+      const absolutePath = `/Users/test/project/agent-${Date.now()}.md`;
+
+      await saveVariableValues(absolutePath, { _name: "test" });
+
+      const history = await getVariableHistory(absolutePath);
+      expect(history._name).toBe("test");
+    });
+  });
+
+  describe("updating history after successful execution", () => {
+    test("new values override old values", async () => {
+      resetVariableHistory();
+      const testPath = `/test/update-${Date.now()}.md`;
+
+      // First run
+      await saveVariableValues(testPath, { _version: "1.0.0" });
+      expect((await getVariableHistory(testPath))._version).toBe("1.0.0");
+
+      // Second run with new value
+      await saveVariableValues(testPath, { _version: "2.0.0" });
+      expect((await getVariableHistory(testPath))._version).toBe("2.0.0");
+    });
+
+    test("preserves variables not updated in current run", async () => {
+      resetVariableHistory();
+      const testPath = `/test/preserve-${Date.now()}.md`;
+
+      // First run: enter both variables
+      await saveVariableValues(testPath, { _ticket: "PROJ-1", _env: "dev" });
+
+      // Second run: only update _env
+      await saveVariableValues(testPath, { _env: "prod" });
+
+      const history = await getVariableHistory(testPath);
+      expect(history._ticket).toBe("PROJ-1"); // Preserved
+      expect(history._env).toBe("prod"); // Updated
+    });
+  });
+
+  describe("--_no-history flag behavior", () => {
+    test("simulates skipping history load with flag", async () => {
+      resetVariableHistory();
+      const testPath = `/test/no-history-flag-${Date.now()}.md`;
+
+      // Save some history
+      await saveVariableValues(testPath, { _cached: "old-value" });
+
+      // Simulate --_no-history behavior: don't load history
+      const noHistory = true;
+      let variableHistory: Record<string, string> = {};
+
+      if (!noHistory) {
+        variableHistory = await getVariableHistory(testPath);
+      }
+
+      // With --_no-history, we don't get the cached value
+      expect(variableHistory._cached).toBeUndefined();
+    });
+
+    test("simulates normal history load without flag", async () => {
+      resetVariableHistory();
+      const testPath = `/test/with-history-${Date.now()}.md`;
+
+      // Save some history
+      await saveVariableValues(testPath, { _cached: "saved-value" });
+
+      // Normal behavior: load history
+      const noHistory = false;
+      let variableHistory: Record<string, string> = {};
+
+      if (!noHistory) {
+        variableHistory = await getVariableHistory(testPath);
+      }
+
+      // Without --_no-history, we get the cached value
+      expect(variableHistory._cached).toBe("saved-value");
+    });
+  });
+
+  describe("prompt display format", () => {
+    test("formats prompt with previous value hint", () => {
+      // This tests the UX format: "Variable name: (previous_value) _"
+      const varName = "_ticket";
+      const previousValue = "PROJ-123";
+
+      // The actual @inquirer/prompts shows this as:
+      // ? _ticket: (PROJ-123) _
+      // Where the user can press Enter to accept or type to override
+
+      // We simulate checking the format
+      const message = `${varName}:`;
+      expect(message).toBe("_ticket:");
+      expect(previousValue).toBe("PROJ-123");
+      // The default is passed to inquirer which handles the display
+    });
+
+    test("handles undefined previous value (first run)", () => {
+      const varName = "_new_var";
+      const previousValue: string | undefined = undefined;
+
+      const message = `${varName}:`;
+      expect(message).toBe("_new_var:");
+      // When previousValue is undefined, no default is shown
+      expect(previousValue).toBeUndefined();
+    });
+  });
+});

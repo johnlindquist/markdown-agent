@@ -63,14 +63,33 @@ async function getInputPrompt() {
   return _input;
 }
 
-// Lazy-load history module (only needed for frecency tracking)
+// Lazy-load history module (only needed for frecency tracking and variable persistence)
 let _recordUsage: typeof import("./history").recordUsage | null = null;
+let _getVariableHistory: typeof import("./history").getVariableHistory | null = null;
+let _saveVariableValues: typeof import("./history").saveVariableValues | null = null;
+
 async function getRecordUsage() {
   if (!_recordUsage) {
     const mod = await import("./history");
     _recordUsage = mod.recordUsage;
   }
   return _recordUsage;
+}
+
+async function getVariableHistoryFn() {
+  if (!_getVariableHistory) {
+    const mod = await import("./history");
+    _getVariableHistory = mod.getVariableHistory;
+  }
+  return _getVariableHistory;
+}
+
+async function getSaveVariableValuesFn() {
+  if (!_saveVariableValues) {
+    const mod = await import("./history");
+    _saveVariableValues = mod.saveVariableValues;
+  }
+  return _saveVariableValues;
 }
 
 /** Result from CliRunner.run() */
@@ -88,6 +107,8 @@ export interface CliRunnerOptions {
   isStdinTTY?: boolean;
   stdinContent?: string;
   promptInput?: (message: string) => Promise<string>;
+  /** Custom prompt with history function (for testing) */
+  promptInputWithHistory?: (message: string, defaultValue?: string) => Promise<string>;
 }
 
 /** CliRunner - Main orchestrator for mdflow CLI */
@@ -98,6 +119,7 @@ export class CliRunner {
   private isStdinTTY: boolean;
   private stdinContent: string | undefined;
   private promptInput: (message: string) => Promise<string>;
+  private promptInputWithHistory: (message: string, defaultValue?: string) => Promise<string>;
 
   constructor(options: CliRunnerOptions) {
     this.env = options.env;
@@ -109,6 +131,12 @@ export class CliRunner {
     this.promptInput = options.promptInput ?? (async (msg) => {
       const inputFn = await getInputPrompt();
       return inputFn({ message: msg });
+    });
+    // Prompt with history shows previous value as default
+    // Format: "Variable name: (previous_value) _" - press Enter to accept
+    this.promptInputWithHistory = options.promptInputWithHistory ?? (async (msg, defaultValue) => {
+      const inputFn = await getInputPrompt();
+      return inputFn({ message: msg, default: defaultValue });
     });
   }
 
@@ -385,6 +413,17 @@ export class CliRunner {
     // Record usage for frecency tracking (skip for failed runs, lazy-load history)
     if (runResult.exitCode === 0) {
       getRecordUsage().then(recordUsage => recordUsage(localFilePath)).catch(() => {}); // Fire and forget
+
+      // Save prompted variable values to history for future runs (fire and forget)
+      const promptedVars = (templateVars as Record<string, unknown>)["__promptedVars__"] as Record<string, string> | undefined;
+      const noHistoryFlag = (templateVars as Record<string, unknown>)["__noHistory__"] as boolean | undefined;
+      const resolvedPath = (templateVars as Record<string, unknown>)["__resolvedFilePath__"] as string | undefined;
+
+      if (promptedVars && Object.keys(promptedVars).length > 0 && !noHistoryFlag && resolvedPath) {
+        getSaveVariableValuesFn()
+          .then(saveVars => saveVars(resolvedPath, promptedVars))
+          .catch(() => {}); // Fire and forget
+      }
     }
 
     if (isRemote) await cleanupRemote(localFilePath);
@@ -414,7 +453,7 @@ export class CliRunner {
     let remainingArgs = [...passthroughArgs];
     let commandFromCli: string | undefined;
     let dryRun = false, trustFlag = false, interactiveFromCli = false, noCache = false, rawOutput = false, editFlag = false;
-    let contextOnly = false, quiet = false, noMenu = false;
+    let contextOnly = false, quiet = false, noMenu = false, noHistory = false;
     let cwdFromCli: string | undefined;
 
     const cmdIdx = remainingArgs.findIndex((a) => a === "--_command" || a === "-_c");
@@ -432,6 +471,9 @@ export class CliRunner {
     if (noCacheIdx !== -1) { noCache = true; remainingArgs.splice(noCacheIdx, 1); }
     const noMenuIdx = remainingArgs.indexOf("--_no-menu");
     if (noMenuIdx !== -1) { noMenu = true; remainingArgs.splice(noMenuIdx, 1); }
+    // --_no-history flag: skip loading/saving variable history
+    const noHistoryIdx = remainingArgs.indexOf("--_no-history");
+    if (noHistoryIdx !== -1) { noHistory = true; remainingArgs.splice(noHistoryIdx, 1); }
     const intIdx = remainingArgs.findIndex((a) => a === "--_interactive" || a === "-_i");
     if (intIdx !== -1) { interactiveFromCli = true; remainingArgs.splice(intIdx, 1); }
     const cwdIdx = remainingArgs.findIndex((a) => a === "--_cwd");
@@ -448,7 +490,7 @@ export class CliRunner {
     const quietIdx = remainingArgs.indexOf("--_quiet");
     if (quietIdx !== -1) { quiet = true; remainingArgs.splice(quietIdx, 1); }
 
-    return { remainingArgs, commandFromCli, dryRun, editFlag, trustFlag, interactiveFromCli, cwdFromCli, noCache, rawOutput, contextOnly, quiet, noMenu };
+    return { remainingArgs, commandFromCli, dryRun, editFlag, trustFlag, interactiveFromCli, cwdFromCli, noCache, rawOutput, contextOnly, quiet, noMenu, noHistory };
   }
 
   private async processAgent(
@@ -458,7 +500,7 @@ export class CliRunner {
     stdinContent: string,
     parsed: ReturnType<typeof this.parseFlags>
   ) {
-    const { remainingArgs, commandFromCli, interactiveFromCli, cwdFromCli } = parsed;
+    const { remainingArgs, commandFromCli, interactiveFromCli, cwdFromCli, noHistory } = parsed;
     let remaining = [...remainingArgs];
 
     // Resolve command
@@ -619,14 +661,37 @@ export class CliRunner {
     // This handles both legacy _inputs and template vars not defined in form inputs
     const requiredVars = extractTemplateVars(phase1Body);
     const missingVars = requiredVars.filter((v) => !(v in templateVars));
+
+    // Load variable history for this agent (unless --_no-history)
+    const resolvedFilePath = resolve(localFilePath);
+    let variableHistory: Record<string, string> = {};
+    if (!noHistory && missingVars.length > 0) {
+      const getVarHistory = await getVariableHistoryFn();
+      variableHistory = await getVarHistory(resolvedFilePath);
+    }
+
+    // Track which variables were prompted (for saving to history later)
+    const promptedVars: Record<string, string> = {};
+
     if (missingVars.length > 0) {
       if (this.isStdinTTY) {
         this.writeStderr("Missing required variables. Please provide values:");
-        for (const v of missingVars) templateVars[v] = await this.promptInput(`${v}:`);
+        for (const v of missingVars) {
+          const previousValue = variableHistory[v];
+          const value = await this.promptInputWithHistory(`${v}:`, previousValue);
+          templateVars[v] = value;
+          promptedVars[v] = value;
+        }
       } else {
         throw new TemplateError(`Missing template variables: ${missingVars.join(", ")}. Use '_inputs:' in frontmatter to map CLI arguments to variables`);
       }
     }
+
+    // Store prompted vars for later saving (attached to templateVars for access after execution)
+    // We use a symbol-like key to avoid conflicts
+    (templateVars as Record<string, unknown>)["__promptedVars__"] = promptedVars;
+    (templateVars as Record<string, unknown>)["__noHistory__"] = noHistory;
+    (templateVars as Record<string, unknown>)["__resolvedFilePath__"] = resolvedFilePath;
 
     // Phase 2: LiquidJS template substitution
     getTemplateLogger().debug({ vars: Object.keys(templateVars) }, "Phase 2: Substituting template variables");

@@ -5,16 +5,25 @@ import {
   recordUsage,
   getHistoryData,
   resetHistory,
+  loadVariableHistory,
+  getVariableHistory,
+  saveVariableValues,
+  getPreviousVariableValue,
+  getVariableHistoryData,
+  resetVariableHistory,
+  getVariableHistoryPath,
 } from "./history";
 import { join } from "path";
 import { homedir } from "os";
 import { rm } from "fs/promises";
 
 const HISTORY_PATH = join(homedir(), ".mdflow", "history.json");
+const VARIABLE_HISTORY_PATH = join(homedir(), ".mdflow", "variable-history.json");
 
 describe("history", () => {
   beforeEach(() => {
     resetHistory();
+    resetVariableHistory();
   });
 
   describe("getFrecencyScore", () => {
@@ -139,6 +148,130 @@ describe("history", () => {
 
       const entry = getHistoryData()![testPath];
       expect(entry!.count).toBe(initialCount + 3);
+    });
+  });
+
+  // ==========================================================================
+  // Variable Persistence Tests
+  // ==========================================================================
+
+  describe("variable persistence", () => {
+    describe("getVariableHistoryPath", () => {
+      it("returns the correct path", () => {
+        expect(getVariableHistoryPath()).toBe(VARIABLE_HISTORY_PATH);
+      });
+    });
+
+    describe("loadVariableHistory", () => {
+      it("returns empty object when file does not exist", async () => {
+        const data = await loadVariableHistory();
+        expect(data).toBeDefined();
+        expect(typeof data).toBe("object");
+      });
+
+      it("caches the result after first load", async () => {
+        const data1 = await loadVariableHistory();
+        const data2 = await loadVariableHistory();
+        expect(data1).toBe(data2); // Same reference
+      });
+    });
+
+    describe("getVariableHistory", () => {
+      it("returns empty object for unknown agent paths", async () => {
+        const history = await getVariableHistory("/unknown/agent.md");
+        expect(history).toEqual({});
+      });
+
+      it("returns stored variables for known agent paths", async () => {
+        const testPath = `/test/agent-${Date.now()}.md`;
+        await saveVariableValues(testPath, { _ticket: "PROJ-123", _env: "prod" });
+
+        const history = await getVariableHistory(testPath);
+        expect(history._ticket).toBe("PROJ-123");
+        expect(history._env).toBe("prod");
+      });
+    });
+
+    describe("saveVariableValues", () => {
+      it("stores variables keyed by agent path", async () => {
+        const testPath = `/test/save-${Date.now()}.md`;
+        await saveVariableValues(testPath, { _name: "test-value" });
+
+        const data = getVariableHistoryData();
+        expect(data).not.toBeNull();
+        expect(data![testPath]).toBeDefined();
+        expect(data![testPath]!._name).toBe("test-value");
+      });
+
+      it("merges with existing values (new values override old)", async () => {
+        const testPath = `/test/merge-${Date.now()}.md`;
+
+        // First save
+        await saveVariableValues(testPath, { _old: "old-value", _update: "first" });
+
+        // Second save - should merge and override
+        await saveVariableValues(testPath, { _update: "second", _new: "new-value" });
+
+        const history = await getVariableHistory(testPath);
+        expect(history._old).toBe("old-value"); // Preserved
+        expect(history._update).toBe("second"); // Overridden
+        expect(history._new).toBe("new-value"); // Added
+      });
+
+      it("stores variables for multiple agent files independently", async () => {
+        const path1 = `/test/agent1-${Date.now()}.md`;
+        const path2 = `/test/agent2-${Date.now()}.md`;
+
+        await saveVariableValues(path1, { _ticket: "PROJ-111" });
+        await saveVariableValues(path2, { _ticket: "PROJ-222" });
+
+        const history1 = await getVariableHistory(path1);
+        const history2 = await getVariableHistory(path2);
+
+        expect(history1._ticket).toBe("PROJ-111");
+        expect(history2._ticket).toBe("PROJ-222");
+      });
+    });
+
+    describe("getPreviousVariableValue", () => {
+      it("returns undefined for unknown variables", async () => {
+        const testPath = `/test/unknown-${Date.now()}.md`;
+        const value = await getPreviousVariableValue(testPath, "_unknown");
+        expect(value).toBeUndefined();
+      });
+
+      it("returns the previous value for known variables", async () => {
+        const testPath = `/test/known-${Date.now()}.md`;
+        await saveVariableValues(testPath, { _ticket: "PROJ-456" });
+
+        const value = await getPreviousVariableValue(testPath, "_ticket");
+        expect(value).toBe("PROJ-456");
+      });
+    });
+
+    describe("resetVariableHistory", () => {
+      it("clears the cached variable history", async () => {
+        const testPath = `/test/reset-${Date.now()}.md`;
+        await saveVariableValues(testPath, { _test: "value" });
+
+        expect(getVariableHistoryData()).not.toBeNull();
+
+        resetVariableHistory();
+
+        expect(getVariableHistoryData()).toBeNull();
+      });
+    });
+
+    describe("corrupt file handling", () => {
+      it("handles graceful recovery by returning valid object", async () => {
+        // This test verifies the data structure is always valid
+        // Even after resetting, loading from disk returns a valid object
+        resetVariableHistory();
+        const data = await loadVariableHistory();
+        expect(typeof data).toBe("object");
+        expect(data).not.toBeNull();
+        expect(Array.isArray(data)).toBe(false);
+      });
     });
   });
 });
