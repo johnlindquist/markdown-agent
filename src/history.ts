@@ -132,3 +132,129 @@ export function getHistoryData(): HistoryData | null {
 export function resetHistory(): void {
   historyData = null;
 }
+
+// =============================================================================
+// Variable Persistence
+// =============================================================================
+
+/**
+ * Structure for storing template variable values per agent file
+ * { "/path/to/agent.md": { "_ticket_id": "PROJ-123", "_env": "prod" } }
+ */
+interface VariableHistoryData {
+  [agentPath: string]: Record<string, string>;
+}
+
+const VARIABLE_HISTORY_PATH = join(homedir(), ".mdflow", "variable-history.json");
+
+let variableHistoryData: VariableHistoryData | null = null;
+
+/**
+ * Load variable history from disk (cached after first load)
+ * Handles missing or corrupt files gracefully
+ */
+export async function loadVariableHistory(): Promise<VariableHistoryData> {
+  if (variableHistoryData !== null) return variableHistoryData;
+
+  try {
+    const file = Bun.file(VARIABLE_HISTORY_PATH);
+    if (await file.exists()) {
+      const content = await file.text();
+      const parsed = JSON.parse(content);
+      // Validate structure: should be an object of objects
+      if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+        variableHistoryData = parsed;
+      } else {
+        variableHistoryData = {};
+      }
+    } else {
+      variableHistoryData = {};
+    }
+  } catch {
+    // Handle corrupt JSON gracefully
+    variableHistoryData = {};
+  }
+
+  return variableHistoryData!;
+}
+
+/**
+ * Save variable history to disk
+ */
+async function saveVariableHistory(): Promise<void> {
+  if (!variableHistoryData) return;
+
+  try {
+    // Ensure directory exists
+    const dir = join(homedir(), ".mdflow");
+    await Bun.write(join(dir, ".keep"), ""); // Create dir if needed
+    await Bun.write(VARIABLE_HISTORY_PATH, JSON.stringify(variableHistoryData, null, 2));
+  } catch {
+    // Silently fail - history is not critical
+  }
+}
+
+/**
+ * Get previous variable values for an agent file
+ * @param agentPath - Absolute path to the agent file
+ * @returns Record of variable names to their previous values, or empty object
+ */
+export async function getVariableHistory(agentPath: string): Promise<Record<string, string>> {
+  await loadVariableHistory();
+  return variableHistoryData![agentPath] ?? {};
+}
+
+/**
+ * Save variable values for an agent file
+ * @param agentPath - Absolute path to the agent file
+ * @param variables - Record of variable names to their values
+ */
+export async function saveVariableValues(
+  agentPath: string,
+  variables: Record<string, string>
+): Promise<void> {
+  await loadVariableHistory();
+
+  // Merge with existing values (new values override old)
+  variableHistoryData![agentPath] = {
+    ...(variableHistoryData![agentPath] ?? {}),
+    ...variables,
+  };
+
+  await saveVariableHistory();
+}
+
+/**
+ * Get a specific variable's previous value
+ * @param agentPath - Absolute path to the agent file
+ * @param varName - Variable name (e.g., "_ticket_id")
+ * @returns Previous value or undefined
+ */
+export async function getPreviousVariableValue(
+  agentPath: string,
+  varName: string
+): Promise<string | undefined> {
+  const history = await getVariableHistory(agentPath);
+  return history[varName];
+}
+
+/**
+ * Get variable history data (for testing)
+ */
+export function getVariableHistoryData(): VariableHistoryData | null {
+  return variableHistoryData;
+}
+
+/**
+ * Reset variable history data (for testing)
+ */
+export function resetVariableHistory(): void {
+  variableHistoryData = null;
+}
+
+/**
+ * Get the path to the variable history file (for testing)
+ */
+export function getVariableHistoryPath(): string {
+  return VARIABLE_HISTORY_PATH;
+}
