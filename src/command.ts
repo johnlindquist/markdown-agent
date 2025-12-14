@@ -6,6 +6,7 @@
 import type { AgentFrontmatter } from "./types";
 import { basename } from "path";
 import { teeToStdoutAndCollect, teeToStderrAndCollect } from "./stream";
+import { stopSpinner } from "./spinner";
 
 /**
  * Module-level reference to the current child process
@@ -319,6 +320,9 @@ export async function runCommand(ctx: RunContext): Promise<RunResult> {
   // Determine stdout/stderr pipe config based on mode
   const shouldPipeStdout = mode === "capture" || mode === "tee";
   const shouldPipeStderr = (mode === "capture" || mode === "tee") && captureStderr;
+
+  // Stop any loading spinner before handing control to the subprocess
+  stopSpinner();
 
   const proc = Bun.spawn([command, ...finalArgs], {
     stdout: shouldPipeStdout ? "pipe" : "inherit",

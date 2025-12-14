@@ -4,6 +4,7 @@ import { realpathSync } from "fs";
 import { homedir } from "os";
 import { EarlyExitRequest, UserCancelledError } from "./errors";
 import { showFileSelectorWithPreview } from "./file-selector";
+import { startSpinner } from "./spinner";
 
 export interface CliArgs {
   filePath: string;
@@ -258,6 +259,8 @@ export async function handleMaCommands(args: CliArgs): Promise<HandleMaCommandsR
       if (mdFiles.length > 0) {
         const selected = await showInteractiveSelector(mdFiles);
         if (selected) {
+          // Start spinner to show activity while preparing the agent
+          startSpinner(`Starting ${basename(selected)}...`);
           return { handled: true, selectedFile: selected };
         }
         // User cancelled - throw error for clean exit
