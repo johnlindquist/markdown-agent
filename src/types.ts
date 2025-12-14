@@ -12,10 +12,52 @@ export interface IOStreams {
   isTTY: boolean;
 }
 
+/**
+ * Input definition for form-style prompts
+ * Supports multiple input types with validation and defaults
+ */
+export interface InputDefinition {
+  /** Type of input prompt to display */
+  type: 'text' | 'select' | 'number' | 'confirm' | 'password';
+  /** Description/help text shown to user */
+  description?: string;
+  /** Default value for the input */
+  default?: string | number | boolean;
+  /** Options for select type */
+  options?: string[];
+  /** Minimum value for number type */
+  min?: number;
+  /** Maximum value for number type */
+  max?: number;
+  /** Whether the input is required (defaults to true) */
+  required?: boolean;
+}
+
+/**
+ * Form inputs schema - maps variable names to their input definitions
+ * Example:
+ * ```yaml
+ * _inputs:
+ *   _name:
+ *     type: text
+ *     description: "Enter your name"
+ *     default: "World"
+ *   _env:
+ *     type: select
+ *     options: [dev, staging, prod]
+ * ```
+ */
+export type FormInputs = Record<string, InputDefinition>;
+
 /** Frontmatter configuration - keys become CLI flags */
 export interface AgentFrontmatter {
-  /** Named positional arguments to consume from CLI and map to template vars */
-  _inputs?: string[];
+  /**
+   * Form inputs schema for interactive prompts
+   * Can be either:
+   * - Simple array of strings (legacy): ["_name", "_value"]
+   * - Object with input definitions (new): { _name: { type: "text", ... } }
+   */
+  _inputs?: string[] | FormInputs;
 
   /**
    * Environment variables to set in process.env before execution.

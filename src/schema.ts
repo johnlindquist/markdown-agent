@@ -9,6 +9,52 @@ import { z } from "zod";
 const stringCoerce = z.union([z.string(), z.number(), z.boolean()]).transform(v => String(v));
 
 // ============================================================================
+// Input Definition Schema (for form-style prompts)
+// ============================================================================
+
+/**
+ * Input definition schema for typed prompts
+ * Validates input type and associated options
+ */
+const inputDefinitionSchema = z.object({
+  type: z.enum(['text', 'select', 'number', 'confirm', 'password']),
+  description: z.string().optional(),
+  default: z.union([z.string(), z.number(), z.boolean()]).optional(),
+  options: z.array(z.string()).optional(),
+  min: z.number().optional(),
+  max: z.number().optional(),
+  required: z.boolean().optional(),
+}).refine(
+  (data) => {
+    // If type is 'select', options must be provided
+    if (data.type === 'select' && (!data.options || data.options.length === 0)) {
+      return false;
+    }
+    return true;
+  },
+  { message: "Select type requires 'options' array with at least one item" }
+).refine(
+  (data) => {
+    // If min/max provided, type should be 'number'
+    if ((data.min !== undefined || data.max !== undefined) && data.type !== 'number') {
+      return false;
+    }
+    return true;
+  },
+  { message: "'min' and 'max' are only valid for number type inputs" }
+);
+
+/**
+ * Form inputs schema - either legacy string array or new object format
+ */
+const formInputsSchema = z.union([
+  z.array(z.string()),
+  z.record(z.string(), inputDefinitionSchema),
+]);
+
+export type InputDefinitionSchema = z.infer<typeof inputDefinitionSchema>;
+
+// ============================================================================
 // Config Schema (for ~/.mdflow/config.yaml and project configs)
 // ============================================================================
 
@@ -87,8 +133,8 @@ export function safeParseConfig(data: unknown): {
 
 /** Main frontmatter schema - minimal, passthrough everything else */
 export const frontmatterSchema = z.object({
-  // Named positional arguments (underscore-prefixed system key)
-  _inputs: z.array(z.string()).optional(),
+  // Form inputs - either legacy string array or new object format with typed definitions
+  _inputs: formInputsSchema.optional(),
 
   // Environment variables (underscore-prefixed system key)
   // Object form sets process.env

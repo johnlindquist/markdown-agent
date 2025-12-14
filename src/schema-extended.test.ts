@@ -66,6 +66,110 @@ describe("frontmatter validation edge cases", () => {
       const result = safeParseFrontmatter({ _inputs: "not-an-array" });
       expect(result.success).toBe(false);
     });
+
+    // New object format tests
+    test("validates _inputs with object format (text type)", () => {
+      const result = validateFrontmatter({
+        _inputs: {
+          _name: { type: "text", description: "Enter name", default: "World" },
+        },
+      });
+      expect(result._inputs).toEqual({
+        _name: { type: "text", description: "Enter name", default: "World" },
+      });
+    });
+
+    test("validates _inputs with object format (select type)", () => {
+      const result = validateFrontmatter({
+        _inputs: {
+          _env: { type: "select", options: ["dev", "staging", "prod"] },
+        },
+      });
+      expect(result._inputs).toEqual({
+        _env: { type: "select", options: ["dev", "staging", "prod"] },
+      });
+    });
+
+    test("validates _inputs with object format (number type with min/max)", () => {
+      const result = validateFrontmatter({
+        _inputs: {
+          _count: { type: "number", min: 1, max: 100, default: 10 },
+        },
+      });
+      expect(result._inputs).toEqual({
+        _count: { type: "number", min: 1, max: 100, default: 10 },
+      });
+    });
+
+    test("validates _inputs with object format (confirm type)", () => {
+      const result = validateFrontmatter({
+        _inputs: {
+          _proceed: { type: "confirm", default: true },
+        },
+      });
+      expect(result._inputs).toEqual({
+        _proceed: { type: "confirm", default: true },
+      });
+    });
+
+    test("validates _inputs with object format (password type)", () => {
+      const result = validateFrontmatter({
+        _inputs: {
+          _secret: { type: "password" },
+        },
+      });
+      expect(result._inputs).toEqual({
+        _secret: { type: "password" },
+      });
+    });
+
+    test("validates _inputs with multiple inputs of different types", () => {
+      const result = validateFrontmatter({
+        _inputs: {
+          _name: { type: "text", default: "World" },
+          _env: { type: "select", options: ["dev", "prod"] },
+          _count: { type: "number", min: 1, max: 10 },
+          _enabled: { type: "confirm", default: false },
+        },
+      });
+      expect(Object.keys(result._inputs || {})).toEqual(["_name", "_env", "_count", "_enabled"]);
+    });
+
+    test("rejects select type without options", () => {
+      const result = safeParseFrontmatter({
+        _inputs: {
+          _env: { type: "select" }, // Missing options
+        },
+      });
+      expect(result.success).toBe(false);
+    });
+
+    test("rejects select type with empty options array", () => {
+      const result = safeParseFrontmatter({
+        _inputs: {
+          _env: { type: "select", options: [] },
+        },
+      });
+      expect(result.success).toBe(false);
+    });
+
+    test("rejects min/max on non-number types", () => {
+      const result = safeParseFrontmatter({
+        _inputs: {
+          _name: { type: "text", min: 1 }, // min not valid for text
+        },
+      });
+      expect(result.success).toBe(false);
+    });
+
+    test("rejects invalid input type", () => {
+      const result = safeParseFrontmatter({
+        _inputs: {
+          _name: { type: "invalid" as any },
+        },
+      });
+      expect(result.success).toBe(false);
+    });
   });
 
   describe("passthrough behavior", () => {
