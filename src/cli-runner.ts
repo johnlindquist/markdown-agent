@@ -8,7 +8,14 @@
 
 import { parseFrontmatter } from "./parse";
 import { parseCliArgs, handleMaCommands } from "./cli";
-import type { AgentFrontmatter } from "./types";
+import type { AgentFrontmatter, FormInputs } from "./types";
+import {
+  isFormInputs,
+  isLegacyInputs,
+  collectFormInputs,
+  getFormInputDefaults,
+  getMissingRequiredInputs,
+} from "./form-inputs";
 import { substituteTemplateVars, extractTemplateVars } from "./template";
 import { isRemoteUrl, fetchRemote, cleanupRemote } from "./remote";
 import {
@@ -519,7 +526,33 @@ export class CliRunner {
       }
     }
 
+    // Handle form inputs if using the new object format
+    if (isFormInputs(frontmatter._inputs)) {
+      const formInputs = frontmatter._inputs as FormInputs;
+
+      // Apply defaults from form input definitions
+      const defaults = getFormInputDefaults(formInputs);
+      for (const [key, value] of Object.entries(defaults)) {
+        if (!(key in templateVars)) {
+          templateVars[key] = value;
+        }
+      }
+
+      // In interactive mode, collect missing form inputs via prompts
+      if (this.isStdinTTY) {
+        const collected = await collectFormInputs(formInputs, templateVars);
+        Object.assign(templateVars, collected);
+      } else {
+        // In non-interactive mode, check for missing required inputs
+        const missingRequired = getMissingRequiredInputs(formInputs, templateVars);
+        if (missingRequired.length > 0) {
+          throw new TemplateError(`Missing required form inputs: ${missingRequired.join(", ")}. Provide values via CLI flags (e.g., --${missingRequired[0]} value)`);
+        }
+      }
+    }
+
     // Check for missing template vars (based on Phase 1 result)
+    // This handles both legacy _inputs and template vars not defined in form inputs
     const requiredVars = extractTemplateVars(phase1Body);
     const missingVars = requiredVars.filter((v) => !(v in templateVars));
     if (missingVars.length > 0) {
@@ -527,7 +560,7 @@ export class CliRunner {
         this.writeStderr("Missing required variables. Please provide values:");
         for (const v of missingVars) templateVars[v] = await this.promptInput(`${v}:`);
       } else {
-        throw new TemplateError(`Missing template variables: ${missingVars.join(", ")}. Use 'args:' in frontmatter to map CLI arguments to variables`);
+        throw new TemplateError(`Missing template variables: ${missingVars.join(", ")}. Use '_inputs:' in frontmatter to map CLI arguments to variables`);
       }
     }
 
