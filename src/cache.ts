@@ -2,7 +2,8 @@
  * Persistent cache module for remote URL content
  *
  * Stores fetched remote content in ~/.mdflow/cache/ using SHA-256 hashes
- * of URLs as filenames. Implements TTL-based cache expiration.
+ * of URLs as filenames. Implements TTL-based cache expiration with
+ * HTTP conditional request support (ETag/Last-Modified).
  */
 
 import { mkdir, stat, readFile, writeFile, rm, readdir } from "fs/promises";
@@ -21,6 +22,96 @@ export interface CacheMetadata {
   url: string;
   fetchedAt: number;
   ttlMs: number;
+  /** ETag from HTTP response for conditional requests */
+  etag?: string;
+  /** Last-Modified header from HTTP response */
+  lastModified?: string;
+}
+
+/**
+ * Proper LRU (Least Recently Used) cache implementation
+ *
+ * Uses Map's insertion order property: delete+set refreshes recency.
+ * When capacity is exceeded, evicts the least recently used entry.
+ */
+export class LRUCache<K, V> {
+  private cache: Map<K, V>;
+  private readonly maxSize: number;
+
+  constructor(maxSize: number) {
+    this.cache = new Map();
+    this.maxSize = maxSize;
+  }
+
+  /**
+   * Get a value and refresh its recency (move to end)
+   */
+  get(key: K): V | undefined {
+    const value = this.cache.get(key);
+    if (value !== undefined) {
+      // Delete and re-set to move to end (most recently used)
+      this.cache.delete(key);
+      this.cache.set(key, value);
+    }
+    return value;
+  }
+
+  /**
+   * Check if key exists without affecting recency
+   */
+  has(key: K): boolean {
+    return this.cache.has(key);
+  }
+
+  /**
+   * Set a value, evicting LRU entry if at capacity
+   */
+  set(key: K, value: V): void {
+    // Zero-capacity cache stores nothing
+    if (this.maxSize <= 0) {
+      return;
+    }
+
+    // If key exists, delete it first to refresh position
+    if (this.cache.has(key)) {
+      this.cache.delete(key);
+    } else if (this.cache.size >= this.maxSize) {
+      // Evict least recently used (first entry in Map)
+      const firstKey = this.cache.keys().next().value;
+      if (firstKey !== undefined) {
+        this.cache.delete(firstKey);
+      }
+    }
+    this.cache.set(key, value);
+  }
+
+  /**
+   * Delete a specific entry
+   */
+  delete(key: K): boolean {
+    return this.cache.delete(key);
+  }
+
+  /**
+   * Clear all entries
+   */
+  clear(): void {
+    this.cache.clear();
+  }
+
+  /**
+   * Get current size
+   */
+  get size(): number {
+    return this.cache.size;
+  }
+
+  /**
+   * Get all keys (for testing/debugging)
+   */
+  keys(): IterableIterator<K> {
+    return this.cache.keys();
+  }
 }
 
 /** Result of a cache lookup */
@@ -37,6 +128,10 @@ export interface CacheOptions {
   ttlMs?: number;
   /** Force bypass cache on read (still writes to cache) */
   noCache?: boolean;
+  /** ETag from HTTP response header */
+  etag?: string;
+  /** Last-Modified from HTTP response header */
+  lastModified?: string;
 }
 
 /**
@@ -56,7 +151,7 @@ export async function ensureCacheDir(): Promise<void> {
 /**
  * Get the file paths for a cached URL
  */
-function getCachePaths(url: string): { contentPath: string; metadataPath: string } {
+export function getCachePaths(url: string): { contentPath: string; metadataPath: string } {
   const hash = hashUrl(url);
   return {
     contentPath: join(CACHE_DIR, `${hash}.content`),
@@ -112,7 +207,7 @@ export async function setCachedContent(
   content: string,
   options: CacheOptions = {}
 ): Promise<void> {
-  const { ttlMs = DEFAULT_CACHE_TTL_MS } = options;
+  const { ttlMs = DEFAULT_CACHE_TTL_MS, etag, lastModified } = options;
 
   await ensureCacheDir();
 
@@ -122,6 +217,8 @@ export async function setCachedContent(
     url,
     fetchedAt: Date.now(),
     ttlMs,
+    ...(etag && { etag }),
+    ...(lastModified && { lastModified }),
   };
 
   // Write both files
@@ -129,6 +226,36 @@ export async function setCachedContent(
     writeFile(contentPath, content, "utf-8"),
     writeFile(metadataPath, JSON.stringify(metadata, null, 2), "utf-8"),
   ]);
+}
+
+/**
+ * Update cache metadata without changing content (for 304 Not Modified responses)
+ */
+export async function touchCacheEntry(
+  url: string,
+  options: CacheOptions = {}
+): Promise<boolean> {
+  const { ttlMs = DEFAULT_CACHE_TTL_MS, etag, lastModified } = options;
+  const { metadataPath } = getCachePaths(url);
+
+  try {
+    const metadataRaw = await readFile(metadataPath, "utf-8");
+    const existingMetadata: CacheMetadata = JSON.parse(metadataRaw);
+
+    // Update fetchedAt to reset TTL, preserve or update etag/lastModified
+    const updatedMetadata: CacheMetadata = {
+      ...existingMetadata,
+      fetchedAt: Date.now(),
+      ttlMs,
+      ...(etag && { etag }),
+      ...(lastModified && { lastModified }),
+    };
+
+    await writeFile(metadataPath, JSON.stringify(updatedMetadata, null, 2), "utf-8");
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**

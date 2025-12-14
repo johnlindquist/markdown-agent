@@ -6,6 +6,7 @@ import {
   hashUrl,
   getCachedContent,
   setCachedContent,
+  touchCacheEntry,
   invalidateCacheEntry,
   clearExpiredCache,
   clearAllCache,
@@ -13,6 +14,7 @@ import {
   ensureCacheDir,
   CACHE_DIR,
   DEFAULT_CACHE_TTL_MS,
+  LRUCache,
 } from "./cache";
 
 // Use a test-specific cache directory to avoid polluting the real cache
@@ -270,5 +272,238 @@ describe("ensureCacheDir", () => {
 
     const stats = await stat(CACHE_DIR);
     expect(stats.isDirectory()).toBe(true);
+  });
+});
+
+describe("LRUCache", () => {
+  test("basic get and set operations", () => {
+    const cache = new LRUCache<string, number>(3);
+
+    cache.set("a", 1);
+    cache.set("b", 2);
+    cache.set("c", 3);
+
+    expect(cache.get("a")).toBe(1);
+    expect(cache.get("b")).toBe(2);
+    expect(cache.get("c")).toBe(3);
+    expect(cache.size).toBe(3);
+  });
+
+  test("evicts least recently used when at capacity", () => {
+    const cache = new LRUCache<string, number>(3);
+
+    cache.set("a", 1);
+    cache.set("b", 2);
+    cache.set("c", 3);
+    // Cache is now full: a, b, c (oldest to newest)
+
+    // Add new item - should evict 'a' (oldest)
+    cache.set("d", 4);
+
+    expect(cache.get("a")).toBeUndefined(); // Evicted
+    expect(cache.get("b")).toBe(2);
+    expect(cache.get("c")).toBe(3);
+    expect(cache.get("d")).toBe(4);
+    expect(cache.size).toBe(3);
+  });
+
+  test("get refreshes recency (proper LRU behavior)", () => {
+    const cache = new LRUCache<string, number>(3);
+
+    cache.set("a", 1);
+    cache.set("b", 2);
+    cache.set("c", 3);
+    // Order: a (oldest), b, c (newest)
+
+    // Access 'a' - this should move it to most recently used
+    cache.get("a");
+    // Order should now be: b (oldest), c, a (newest)
+
+    // Add new item - should evict 'b' (now oldest), NOT 'a'
+    cache.set("d", 4);
+
+    expect(cache.get("a")).toBe(1); // 'a' was refreshed, so still present
+    expect(cache.get("b")).toBeUndefined(); // 'b' was evicted
+    expect(cache.get("c")).toBe(3);
+    expect(cache.get("d")).toBe(4);
+  });
+
+  test("updating existing key refreshes recency", () => {
+    const cache = new LRUCache<string, number>(3);
+
+    cache.set("a", 1);
+    cache.set("b", 2);
+    cache.set("c", 3);
+    // Order: a (oldest), b, c
+
+    // Update 'a' - should refresh recency
+    cache.set("a", 100);
+    // Order: b (oldest), c, a (newest)
+
+    // Add new item - should evict 'b'
+    cache.set("d", 4);
+
+    expect(cache.get("a")).toBe(100); // Updated value, still present
+    expect(cache.get("b")).toBeUndefined(); // Evicted
+    expect(cache.size).toBe(3);
+  });
+
+  test("has() does not affect recency", () => {
+    const cache = new LRUCache<string, number>(3);
+
+    cache.set("a", 1);
+    cache.set("b", 2);
+    cache.set("c", 3);
+
+    // Check if 'a' exists (should NOT refresh recency)
+    expect(cache.has("a")).toBe(true);
+
+    // Add two new items - 'a' should be evicted first, then 'b'
+    cache.set("d", 4);
+    cache.set("e", 5);
+
+    expect(cache.get("a")).toBeUndefined(); // Evicted
+    expect(cache.get("b")).toBeUndefined(); // Evicted
+    expect(cache.get("c")).toBe(3);
+  });
+
+  test("delete removes entry", () => {
+    const cache = new LRUCache<string, number>(3);
+
+    cache.set("a", 1);
+    cache.set("b", 2);
+
+    expect(cache.delete("a")).toBe(true);
+    expect(cache.get("a")).toBeUndefined();
+    expect(cache.size).toBe(1);
+    expect(cache.delete("nonexistent")).toBe(false);
+  });
+
+  test("clear removes all entries", () => {
+    const cache = new LRUCache<string, number>(3);
+
+    cache.set("a", 1);
+    cache.set("b", 2);
+    cache.set("c", 3);
+
+    cache.clear();
+
+    expect(cache.size).toBe(0);
+    expect(cache.get("a")).toBeUndefined();
+    expect(cache.get("b")).toBeUndefined();
+    expect(cache.get("c")).toBeUndefined();
+  });
+
+  test("keys() returns all keys", () => {
+    const cache = new LRUCache<string, number>(3);
+
+    cache.set("a", 1);
+    cache.set("b", 2);
+    cache.set("c", 3);
+
+    const keys = [...cache.keys()];
+    expect(keys).toContain("a");
+    expect(keys).toContain("b");
+    expect(keys).toContain("c");
+    expect(keys).toHaveLength(3);
+  });
+
+  test("handles zero-capacity cache", () => {
+    const cache = new LRUCache<string, number>(0);
+
+    cache.set("a", 1);
+    expect(cache.get("a")).toBeUndefined();
+    expect(cache.size).toBe(0);
+  });
+});
+
+describe("HTTP cache headers (ETag/Last-Modified)", () => {
+  test("stores etag in metadata", async () => {
+    const url = "https://example.com/etag-test.md";
+    const content = "Content with ETag";
+    const etag = '"abc123"';
+
+    await setCachedContent(url, content, { etag });
+    const result = await getCachedContent(url);
+
+    expect(result.hit).toBe(true);
+    expect(result.metadata?.etag).toBe(etag);
+  });
+
+  test("stores lastModified in metadata", async () => {
+    const url = "https://example.com/last-modified-test.md";
+    const content = "Content with Last-Modified";
+    const lastModified = "Wed, 21 Oct 2015 07:28:00 GMT";
+
+    await setCachedContent(url, content, { lastModified });
+    const result = await getCachedContent(url);
+
+    expect(result.hit).toBe(true);
+    expect(result.metadata?.lastModified).toBe(lastModified);
+  });
+
+  test("stores both etag and lastModified", async () => {
+    const url = "https://example.com/both-headers-test.md";
+    const content = "Content with both headers";
+    const etag = '"xyz789"';
+    const lastModified = "Thu, 22 Oct 2015 08:30:00 GMT";
+
+    await setCachedContent(url, content, { etag, lastModified });
+    const result = await getCachedContent(url);
+
+    expect(result.hit).toBe(true);
+    expect(result.metadata?.etag).toBe(etag);
+    expect(result.metadata?.lastModified).toBe(lastModified);
+  });
+
+  test("touchCacheEntry updates fetchedAt without changing content", async () => {
+    const url = "https://example.com/touch-test.md";
+    const content = "Original content";
+    const etag = '"original"';
+
+    await setCachedContent(url, content, { etag, ttlMs: 1 });
+
+    // Wait for expiration
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    // Verify it's expired
+    const expiredResult = await getCachedContent(url, { ttlMs: 1 });
+    expect(expiredResult.hit).toBe(false);
+    expect(expiredResult.expired).toBe(true);
+
+    // Touch to refresh TTL
+    const touched = await touchCacheEntry(url, { etag: '"updated"', ttlMs: 60000 });
+    expect(touched).toBe(true);
+
+    // Should now be valid again
+    const refreshedResult = await getCachedContent(url, { ttlMs: 60000 });
+    expect(refreshedResult.hit).toBe(true);
+    expect(refreshedResult.content).toBe(content); // Content unchanged
+    expect(refreshedResult.metadata?.etag).toBe('"updated"'); // ETag updated
+  });
+
+  test("touchCacheEntry returns false for non-existent entry", async () => {
+    const result = await touchCacheEntry("https://nonexistent.example.com/touch.md");
+    expect(result).toBe(false);
+  });
+
+  test("expired cache returns metadata for conditional request", async () => {
+    const url = "https://example.com/conditional-test.md";
+    const content = "Content for conditional request";
+    const etag = '"cond123"';
+    const lastModified = "Fri, 23 Oct 2015 09:45:00 GMT";
+
+    await setCachedContent(url, content, { etag, lastModified, ttlMs: 1 });
+
+    // Wait for expiration
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    const result = await getCachedContent(url, { ttlMs: 1 });
+
+    expect(result.hit).toBe(false);
+    expect(result.expired).toBe(true);
+    // Metadata should still be available for conditional request
+    expect(result.metadata?.etag).toBe(etag);
+    expect(result.metadata?.lastModified).toBe(lastModified);
   });
 });

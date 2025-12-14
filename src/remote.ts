@@ -1,6 +1,9 @@
 /**
  * Remote execution support for running agents from URLs
  * Enables npx-style execution: md https://gist.github.com/user/setup.md
+ *
+ * Supports HTTP conditional requests (ETag/Last-Modified) for efficient
+ * cache revalidation without re-downloading unchanged content.
  */
 
 import { mkdtemp, rm } from "fs/promises";
@@ -10,9 +13,12 @@ import { resilientFetch } from "./fetch";
 import {
   getCachedContent,
   setCachedContent,
+  touchCacheEntry,
+  getCachePaths,
   DEFAULT_CACHE_TTL_MS,
   type CacheOptions,
 } from "./cache";
+import { readFile } from "fs/promises";
 
 export interface RemoteResult {
   success: boolean;
@@ -72,6 +78,11 @@ export function toRawUrl(url: string): string {
  *
  * Uses persistent cache at ~/.mdflow/cache/ to avoid repeated fetches.
  * Cache uses SHA-256 hash of URL as filename with configurable TTL.
+ *
+ * Supports HTTP conditional requests:
+ * - If cache has ETag, sends If-None-Match header
+ * - If cache has Last-Modified, sends If-Modified-Since header
+ * - On 304 Not Modified, reuses cached content and refreshes TTL
  */
 export async function fetchRemote(
   url: string,
@@ -95,37 +106,76 @@ export async function fetchRemote(
     let fromCache = false;
 
     if (cacheResult.hit && cacheResult.content) {
-      // Cache hit - use cached content
+      // Cache hit and not expired - use cached content
       console.error(`Cache hit: ${rawUrl}`);
       content = cacheResult.content;
       fromCache = true;
     } else {
-      // Cache miss or expired - fetch fresh content
-      if (cacheResult.expired) {
+      // Cache miss or expired - fetch (with conditional request if we have cached data)
+      const headers: Record<string, string> = {
+        "User-Agent": "mdflow/1.0",
+        Accept: "text/plain, text/markdown, */*",
+      };
+
+      // Add conditional request headers if we have cached metadata
+      const cachedMeta = cacheResult.metadata;
+      if (cachedMeta?.etag) {
+        headers["If-None-Match"] = cachedMeta.etag;
+      }
+      if (cachedMeta?.lastModified) {
+        headers["If-Modified-Since"] = cachedMeta.lastModified;
+      }
+
+      if (cacheResult.expired && (cachedMeta?.etag || cachedMeta?.lastModified)) {
+        console.error(`Cache expired, validating: ${rawUrl}`);
+      } else if (cacheResult.expired) {
         console.error(`Cache expired, refetching: ${rawUrl}`);
       } else {
         console.error(`Fetching: ${rawUrl}`);
       }
 
-      const response = await resilientFetch(rawUrl, {
-        headers: {
-          "User-Agent": "mdflow/1.0",
-          Accept: "text/plain, text/markdown, */*",
-        },
-      });
+      const response = await resilientFetch(rawUrl, { headers });
 
-      if (!response.ok) {
+      // Handle 304 Not Modified - content hasn't changed
+      if (response.status === 304 && cacheResult.metadata) {
+        console.error(`Not modified (304), using cache: ${rawUrl}`);
+
+        // Read cached content directly from disk
+        const { contentPath } = getCachePaths(rawUrl);
+        const cachedContent = await readFile(contentPath, "utf-8");
+
+        // Update cache metadata to refresh TTL
+        const newEtag = response.headers.get("etag") || cachedMeta.etag;
+        const newLastModified = response.headers.get("last-modified") || cachedMeta.lastModified;
+
+        await touchCacheEntry(rawUrl, {
+          ttlMs: cacheTtlMs,
+          etag: newEtag,
+          lastModified: newLastModified,
+        });
+
+        content = cachedContent;
+        fromCache = true;
+      } else if (!response.ok) {
         return {
           success: false,
           error: `HTTP ${response.status}: ${response.statusText}`,
           isRemote: true,
         };
+      } else {
+        // New content - extract cache headers and store
+        content = await response.text();
+
+        const etag = response.headers.get("etag") || undefined;
+        const lastModified = response.headers.get("last-modified") || undefined;
+
+        // Store in cache for future use with HTTP headers
+        await setCachedContent(rawUrl, content, {
+          ttlMs: cacheTtlMs,
+          etag,
+          lastModified,
+        });
       }
-
-      content = await response.text();
-
-      // Store in cache for future use
-      await setCachedContent(rawUrl, content, { ttlMs: cacheTtlMs });
     }
 
     // Create temp directory for the execution

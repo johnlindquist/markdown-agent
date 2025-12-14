@@ -18,6 +18,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { homedir } from "os";
 import { spawnSync } from "node:child_process";
 import type { AgentFile } from "./cli";
+import { LRUCache } from "./cache";
 
 /** Result from file selector - either a path to run, edit, or dry-run */
 export interface FileSelectorResult {
@@ -38,26 +39,23 @@ interface ExtendedKeyEvent extends KeypressEvent {
   shift?: boolean;
 }
 
-// Cache for file contents to avoid repeated reads
-const fileContentCache = new Map<string, string>();
+// Proper LRU cache for file contents (refreshes recency on read)
+const fileContentCache = new LRUCache<string, string>(100);
 
 /**
- * Read file content with caching (synchronous for use in render loop)
+ * Read file content with LRU caching (synchronous for use in render loop)
+ * Uses proper LRU eviction - recently accessed items are kept, oldest evicted.
  */
 function readFileContentSync(filePath: string): string {
-  if (fileContentCache.has(filePath)) {
-    return fileContentCache.get(filePath)!;
+  const cached = fileContentCache.get(filePath);
+  if (cached !== undefined) {
+    return cached;
   }
   try {
     if (!existsSync(filePath)) {
       return `[File not found: ${filePath}]`;
     }
     const content = readFileSync(filePath, "utf8");
-    // Limit cache size to prevent memory issues
-    if (fileContentCache.size > 100) {
-      const firstKey = fileContentCache.keys().next().value;
-      if (firstKey) fileContentCache.delete(firstKey);
-    }
     fileContentCache.set(filePath, content);
     return content;
   } catch (error) {
