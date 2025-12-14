@@ -261,8 +261,21 @@ export const WARN_TOKENS = 50_000;
 export const CHARS_PER_TOKEN = 4;
 const MAX_CHARS = MAX_TOKENS * CHARS_PER_TOKEN;
 
-/** Command execution timeout in milliseconds (30 seconds) */
-const COMMAND_TIMEOUT_MS = 30_000;
+import { getProcessManager } from "./process-manager";
+
+/** Default command execution timeout in milliseconds (30 seconds) */
+const DEFAULT_COMMAND_TIMEOUT_MS = 30_000;
+
+/**
+ * Get command timeout from ProcessManager or use default
+ */
+function getCommandTimeout(): number {
+  try {
+    return getProcessManager().timeouts.commandTimeout;
+  } catch {
+    return DEFAULT_COMMAND_TIMEOUT_MS;
+  }
+}
 
 /** Maximum command output size in characters (~25k tokens) */
 const MAX_COMMAND_OUTPUT_SIZE = 100_000;
@@ -957,6 +970,7 @@ async function processCommandInline(
   // Track process for timeout cleanup
   let proc: ReturnType<typeof Bun.spawn> | null = null;
   let timedOut = false;
+  const pm = getProcessManager();
 
   try {
     proc = Bun.spawn([shell, ...shellArgs], {
@@ -965,6 +979,9 @@ async function processCommandInline(
       stderr: "pipe",
       env: env as Record<string, string>,
     });
+
+    // Register with ProcessManager for centralized cleanup on SIGINT/SIGTERM
+    pm.register(proc, `inline: ${actualCommand.slice(0, 40)}`);
 
     // Buffers for final output
     const stdoutChunks: Uint8Array[] = [];
@@ -993,12 +1010,14 @@ async function processCommandInline(
     };
 
     // Improvement #4: Execution timeout using Promise.race
+    // Uses configurable timeout from ProcessManager
+    const commandTimeout = getCommandTimeout();
     const timeoutPromise = new Promise<never>((_, reject) => {
       setTimeout(() => {
         timedOut = true;
         proc?.kill();
-        reject(new Error(`Command timed out after ${COMMAND_TIMEOUT_MS}ms: ${actualCommand}`));
-      }, COMMAND_TIMEOUT_MS);
+        reject(new Error(`Command timed out after ${commandTimeout}ms: ${actualCommand}`));
+      }, commandTimeout);
     });
 
     // Read streams with timeout (stdout/stderr are guaranteed with "pipe" option)

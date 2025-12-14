@@ -3,21 +3,29 @@
  * Entry point for mdflow CLI
  *
  * This is a minimal entry point that:
- * 1. Sets up EPIPE handlers for graceful pipe handling
- * 2. Creates a CliRunner with the real system environment
- * 3. Runs the CLI and exits with the appropriate code
+ * 1. Initializes ProcessManager for centralized lifecycle management
+ * 2. Sets up EPIPE handlers for graceful pipe handling
+ * 3. Creates a CliRunner with the real system environment
+ * 4. Runs the CLI and exits with the appropriate code
  *
  * All orchestration logic is in CliRunner for testability.
  */
 
 import { CliRunner } from "./cli-runner";
 import { BunSystemEnvironment } from "./system-environment";
+import { getProcessManager } from "./process-manager";
 
 async function main() {
+  // Initialize ProcessManager early for centralized signal handling
+  // This ensures cursor restoration and process cleanup on SIGINT/SIGTERM
+  const pm = getProcessManager();
+  pm.initialize();
+
   // Handle EPIPE gracefully when downstream closes the pipe early
   // (e.g., `md task.md | head -n 5`)
   process.stdout.on("error", (err: NodeJS.ErrnoException) => {
     if (err.code === "EPIPE") {
+      pm.restoreTerminal(); // Ensure cursor is visible
       process.exit(0);
     }
     throw err;
@@ -25,6 +33,7 @@ async function main() {
 
   process.stderr.on("error", (err: NodeJS.ErrnoException) => {
     if (err.code === "EPIPE") {
+      pm.restoreTerminal(); // Ensure cursor is visible
       process.exit(0);
     }
     throw err;

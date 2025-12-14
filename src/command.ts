@@ -1,22 +1,27 @@
 /**
  * Command execution - simple, direct, unix-style
  * No abstraction layers, just frontmatter → CLI args → spawn
+ *
+ * Integrates with ProcessManager for centralized process lifecycle management
  */
 
 import type { AgentFrontmatter } from "./types";
 import { basename } from "path";
 import { teeToStdoutAndCollect, teeToStderrAndCollect } from "./stream";
 import { stopSpinner, isSpinnerRunning } from "./spinner";
+import { getProcessManager } from "./process-manager";
 
 /**
  * Module-level reference to the current child process
  * Used for graceful signal handling (SIGINT/SIGTERM cleanup)
+ * @deprecated Use ProcessManager.getInstance() instead for new code
  */
 let currentChildProcess: ReturnType<typeof Bun.spawn> | null = null;
 
 /**
  * Get the current child process reference
  * Returns null if no process is running
+ * @deprecated Use ProcessManager.getInstance().getActiveProcesses() instead
  */
 export function getCurrentChildProcess(): ReturnType<typeof Bun.spawn> | null {
   return currentChildProcess;
@@ -25,8 +30,18 @@ export function getCurrentChildProcess(): ReturnType<typeof Bun.spawn> | null {
 /**
  * Kill the current child process if running
  * Returns true if a process was killed, false otherwise
+ * @deprecated Use ProcessManager.getInstance().killAll() instead
  */
 export function killCurrentChildProcess(): boolean {
+  // First try ProcessManager (which handles process groups)
+  const pm = getProcessManager();
+  if (pm.activeCount > 0) {
+    pm.killAll();
+    currentChildProcess = null;
+    return true;
+  }
+
+  // Fallback for legacy code
   if (currentChildProcess) {
     try {
       currentChildProcess.kill("SIGTERM");
@@ -330,7 +345,11 @@ export async function runCommand(ctx: RunContext): Promise<RunResult> {
     env: runEnv,
   });
 
-  // Store reference for signal handling
+  // Register with ProcessManager for centralized lifecycle management
+  const pm = getProcessManager();
+  pm.register(proc, command);
+
+  // Store reference for legacy signal handling (deprecated)
   currentChildProcess = proc;
 
   let stdout = "";

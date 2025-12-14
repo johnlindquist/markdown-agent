@@ -1,7 +1,11 @@
 /**
  * Simple spinner for CLI feedback
  * Shows an animated spinner with a message while work is in progress
+ *
+ * Integrates with ProcessManager for proper cursor restoration on SIGINT/SIGTERM
  */
+
+import { getProcessManager } from "./process-manager";
 
 const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 
@@ -27,8 +31,10 @@ export function startSpinner(message: string): void {
   currentMessage = message;
   currentFrame = 0;
 
-  // Hide cursor
+  // Hide cursor and notify ProcessManager
   process.stderr.write('\x1B[?25l');
+  getProcessManager().setCursorHidden(true);
+
   render();
   interval = setInterval(render, 80);
 }
@@ -45,6 +51,9 @@ export function stopSpinner(): void {
   // Clear line and show cursor
   process.stderr.write('\r\x1B[K');
   process.stderr.write('\x1B[?25h');
+
+  // Notify ProcessManager that cursor is restored
+  getProcessManager().setCursorHidden(false);
 }
 
 /**

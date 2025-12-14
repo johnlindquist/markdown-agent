@@ -15,6 +15,7 @@ import {
   resolveCommand, buildArgs, runCommand, extractPositionalMappings,
   extractEnvVars, killCurrentChildProcess, hasInteractiveMarker,
 } from "./command";
+import { getProcessManager } from "./process-manager";
 import {
   expandImports, hasImports,
   expandContentImports, expandCommandImports,
@@ -272,14 +273,14 @@ export class CliRunner {
       localFilePath = await this.resolveFilePath(filePath);
     }
 
-    // Signal handling
-    const handleSignal = async (signal: string) => {
-      killCurrentChildProcess();
-      if (isRemote) await cleanupRemote(localFilePath);
-      process.exit(signal === "SIGINT" ? 130 : 143);
-    };
-    process.on("SIGINT", () => handleSignal("SIGINT"));
-    process.on("SIGTERM", () => handleSignal("SIGTERM"));
+    // Initialize ProcessManager for centralized lifecycle management
+    const pm = getProcessManager();
+    pm.initialize();
+
+    // Register cleanup callback for remote file cleanup
+    if (isRemote) {
+      pm.onCleanup(() => cleanupRemote(localFilePath));
+    }
 
     if (!(await this.env.fs.exists(localFilePath))) {
       throw new FileNotFoundError(`File not found: ${localFilePath}`);
