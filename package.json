@@ -1,6 +1,6 @@
 {
   "name": "mdflow",
-  "version": "2.35.1",
+  "version": "2.35.2",
   "module": "src/index.ts",
   "type": "module",
   "repository": {

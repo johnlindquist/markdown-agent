@@ -1,3 +1,10 @@
+## [2.35.2](https://github.com/johnlindquist/mdflow/compare/v2.35.1...v2.35.2) (2025-12-16)
+
+
+### Bug Fixes
+
+* support parent directory glob patterns in imports (closes [#13](https://github.com/johnlindquist/mdflow/issues/13)) ([89bbda9](https://github.com/johnlindquist/mdflow/commit/89bbda9f1dc42c545421250616a8f1f1bef2ca11))
+
 ## [2.35.1](https://github.com/johnlindquist/mdflow/compare/v2.35.0...v2.35.1) (2025-12-16)
 
 
