@@ -1,3 +1,10 @@
+## [2.35.1](https://github.com/johnlindquist/mdflow/compare/v2.35.0...v2.35.1) (2025-12-16)
+
+
+### Bug Fixes
+
+* update README and GUIDE with correct CLI usage and new features ([7155be1](https://github.com/johnlindquist/mdflow/commit/7155be143c4f068a5be6d88c09dd5b3730363075))
+
 # [2.35.0](https://github.com/johnlindquist/mdflow/compare/v2.34.0...v2.35.0) (2025-12-16)
 
 
