@@ -349,8 +349,9 @@ export const postRunMenu = createPrompt<PostRunMenuResult, PostRunMenuConfig>(
 export async function showPostRunMenu(
   output: string
 ): Promise<PostRunMenuResult | undefined> {
-  // Don't show menu if no output or not a TTY
-  if (!output.trim() || !process.stdin.isTTY) {
+  // Don't show menu if no output or not a TTY (stdin AND stdout)
+  // Checking stdout enables piping: foo.md | bar.md
+  if (!output.trim() || !process.stdin.isTTY || !process.stdout.isTTY) {
     return undefined;
   }
 

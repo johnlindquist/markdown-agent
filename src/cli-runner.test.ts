@@ -333,4 +333,59 @@ Content without command`);
       expect(result.errorMessage).toContain("No command specified");
     });
   });
+
+  describe("piping support (isStdoutTTY)", () => {
+    it("accepts isStdoutTTY option", async () => {
+      env.addFile("/test/pipe.echo.md", `---
+---
+Test piping`);
+
+      // Simulates: md pipe.echo.md | other-command
+      // When piping, stdout is not a TTY
+      const runner = new CliRunner({
+        env,
+        isStdinTTY: true,
+        isStdoutTTY: false, // stdout piped to another command
+        cwd: "/test",
+      });
+
+      const result = await runner.run(["node", "md", "/test/pipe.echo.md", "--_dry-run"]);
+      expect(result.exitCode).toBe(0);
+    });
+
+    it("accepts both stdin and stdout as non-TTY (middle of pipeline)", async () => {
+      env.addFile("/test/middle.echo.md", `---
+---
+Middle of pipeline`);
+
+      // Simulates: first.md | md middle.echo.md | last.md
+      const runner = new CliRunner({
+        env,
+        isStdinTTY: false, // stdin from pipe
+        isStdoutTTY: false, // stdout to pipe
+        stdinContent: "piped input",
+        cwd: "/test",
+      });
+
+      const result = await runner.run(["node", "md", "/test/middle.echo.md", "--_dry-run"]);
+      expect(result.exitCode).toBe(0);
+    });
+
+    it("defaults isStdoutTTY when not provided", async () => {
+      env.addFile("/test/default.echo.md", `---
+---
+Test default`);
+
+      // When isStdoutTTY is not provided, it should default to process.stdout.isTTY
+      const runner = new CliRunner({
+        env,
+        isStdinTTY: true,
+        // isStdoutTTY not provided - should use process.stdout.isTTY
+        cwd: "/test",
+      });
+
+      const result = await runner.run(["node", "md", "/test/default.echo.md", "--_dry-run"]);
+      expect(result.exitCode).toBe(0);
+    });
+  });
 });

@@ -107,6 +107,7 @@ export interface CliRunnerOptions {
   processEnv?: Record<string, string | undefined>;
   cwd?: string;
   isStdinTTY?: boolean;
+  isStdoutTTY?: boolean;
   stdinContent?: string;
   promptInput?: (message: string) => Promise<string>;
   /** Custom prompt with history function (for testing) */
@@ -119,6 +120,7 @@ export class CliRunner {
   private processEnv: Record<string, string | undefined>;
   private cwd: string;
   private isStdinTTY: boolean;
+  private isStdoutTTY: boolean;
   private stdinContent: string | undefined;
   private promptInput: (message: string) => Promise<string>;
   private promptInputWithHistory: (message: string, defaultValue?: string) => Promise<string>;
@@ -128,6 +130,7 @@ export class CliRunner {
     this.processEnv = options.processEnv ?? process.env;
     this.cwd = options.cwd ?? process.cwd();
     this.isStdinTTY = options.isStdinTTY ?? Boolean(process.stdin.isTTY);
+    this.isStdoutTTY = options.isStdoutTTY ?? Boolean(process.stdout.isTTY);
     this.stdinContent = options.stdinContent;
     // Lazy-load input prompt only when actually needed
     this.promptInput = options.promptInput ?? (async (msg) => {
@@ -392,7 +395,8 @@ export class CliRunner {
     startSpinner(preview);
 
     // Determine if we should capture output for post-run menu
-    const shouldShowMenu = this.isStdinTTY && !parsed.noMenu;
+    // Disable when piping (stdout not TTY) to support: foo.md | bar.md
+    const shouldShowMenu = this.isStdinTTY && this.isStdoutTTY && !parsed.noMenu;
     const captureMode = shouldShowMenu ? "tee" as const : false;
 
     const runResult = await runCommand({
@@ -537,8 +541,9 @@ export class CliRunner {
     }
 
     // Determine if we should capture output for post-run menu
-    // Only capture when: TTY, not piped, menu not disabled
-    const shouldShowMenu = this.isStdinTTY && !parsed.noMenu;
+    // Only capture when: TTY (stdin+stdout), not piped, menu not disabled
+    // Checking stdout.isTTY enables piping: foo.md | bar.md
+    const shouldShowMenu = this.isStdinTTY && this.isStdoutTTY && !parsed.noMenu;
     // Always capture stderr when in interactive mode for failure menu
     const captureMode = shouldShowMenu ? "tee" as const : false;
 
