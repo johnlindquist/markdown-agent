@@ -1,58 +1,78 @@
 ---
 model: opus
+_project: "{{ _project | default: 'MyProject' }}"
+_tech_stack: "{{ _tech_stack | default: 'TypeScript + Bun' }}"
 ---
 
-# Implementation Plan: Technical Approach
+# Implementation Plan: {{ _project }}
 
-Describe your chosen technology stack and architecture for solving the specification.
+Technical architecture and implementation approach based on requirements.
 
-## Technology Stack
-- **Runtime**: Bun (fast JavaScript/TypeScript runtime)
-- **Language**: TypeScript (type safety)
-- **Template Engine**: LiquidJS (flexible templating)
-- **Validation**: Zod (schema validation)
-- **Logging**: Pino (structured logging)
-- **CLI**: Commander.js (command framework)
+**Technology Stack**: {{ _tech_stack }}  
+**Reference Spec**: @./specify.claude.md
+
+## Current Project Analysis
+```
+Dependencies:
+!npm list --depth=0
+
+Build config:
+!cat package.json | grep -A 5 '"scripts"'
+
+Existing architecture:
+!find src -type f -name "*.ts" | head -20
+```
 
 ## Architecture Overview
 
 ### Core Components
-1. **Frontmatter Parser**: Parse YAML from markdown files
-2. **Template Engine**: Process LiquidJS templates with variable substitution
-3. **Import System**: Handle file imports, globs, and command execution
-4. **Command Resolver**: Determine which CLI tool to invoke
-5. **Execution Engine**: Execute commands with proper argument passing
+1. **[Component A]**: Purpose and responsibilities
+2. **[Component B]**: Purpose and responsibilities
+3. **[Component C]**: Purpose and responsibilities
 
-### Data Flow
+### Data Flow Diagram
 ```
-.md file 
-  → Parse frontmatter (YAML)
-  → Load global config
-  → Apply defaults
-  → Expand imports (@./file.md, !`cmd`)
-  → Substitute templates ({{ _varname }})
-  → Build CLI args
-  → Execute command
+Input
+  ↓
+[Process]
+  ↓
+Output
 ```
 
-## Module Structure
+### Technology Decisions
+| Decision | Choice | Reasoning |
+|----------|--------|-----------|
+| Runtime | {{ _tech_stack }} | [Why?] |
+| Language | TypeScript | Type safety |
+| Framework | [X] | [Why?] |
+
+## Implementation Approach
+
+### Phase 1: Foundation
+- Set up project structure
+- Configure tooling
+- Establish patterns
+
+### Phase 2: Core Features
+- Feature A
+- Feature B
+- Feature C
+
+### Phase 3: Integration
+- Connect components
+- End-to-end testing
+- Documentation
+
+## Risk Assessment
+| Risk | Mitigation |
+|------|-----------|
+| [Risk] | [Plan] |
+
+---
+
+**Usage**: Import this plan into `tasks.claude.md`:
 ```
-src/
-├── index.ts           # CLI entry point
-├── command.ts         # Command resolution and execution
-├── config.ts          # Configuration management
-├── template.ts        # Template variable substitution
-├── imports.ts         # File/glob/command imports
-├── env.ts             # Environment loading
-├── types.ts           # Type definitions
-├── schema.ts          # Validation schemas
-├── logger.ts          # Logging setup
-└── history.ts         # Frecency and variable history
+@./plan.claude.md
 ```
 
-## Key Design Decisions
-1. **Markdown + YAML**: Simple, readable, version-controllable
-2. **Passthrough architecture**: Only consume system keys, pass rest to CLI tool
-3. **Template-first**: Variables are processed before command execution
-4. **Modular imports**: Compose agents from multiple files
-5. **History-aware**: Learn from previous variable inputs
+**Next**: `md tasks.claude.md --_project "{{ _project }}"`

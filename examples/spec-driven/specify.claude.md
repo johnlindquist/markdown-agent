@@ -1,45 +1,70 @@
 ---
 model: opus
+_project: "{{ _project | default: 'MyProject' }}"
+_interactive: true
 ---
 
-# Specification: What We're Building
+# Specification: {{ _project }} Requirements
 
-Describe what you want to build, focusing on the **what** and **why**, not the technical details.
+Define what you want to build, focusing on the **what** and **why**, not the technical details.
 
-## Feature Name
-[e.g., "Markdown Agent Executor"]
+**Status**: Interactive workshop  
+**Reference**: @./constitution.claude.md
+
+## Feature Overview
+
+Describe the problem your feature solves:
+
+```
+What problem are we solving?
+Who has this problem?
+Why is it valuable?
+```
 
 ## User Stories
 
-### As a developer, I want to...
-Define clear user-focused outcomes that the feature should enable.
+### Story 1: Core User Journey
+**As a [user type], I want to [action] so that [outcome]**
 
-**Story 1: Create and run markdown-based agents**
-- Define AI agents as simple markdown files
-- Configure behavior with YAML frontmatter
-- Execute agents from the command line
-- Get results in print or interactive mode
+- Acceptance criteria 1
+- Acceptance criteria 2
+- Acceptance criteria 3
 
-**Story 2: Use template variables and imports**
-- Reference dynamic values in markdown content
-- Import external files or command outputs
-- Use conditional logic in templates
-- Access command-line arguments
+### Story 2: Advanced Usage
+**As a [power user], I want to [action] so that [outcome]**
 
-**Story 3: Manage configuration globally**
-- Set command defaults in `~/.mdflow/config.yaml`
-- Override defaults per agent
-- Store and recall variable history
-- Track usage frequency
+- Acceptance criteria 1
+- Acceptance criteria 2
 
-## Success Criteria
-- [ ] Agents can be defined and executed via markdown files
-- [ ] Template variables work correctly
-- [ ] File imports and command outputs integrate seamlessly
-- [ ] Configuration management works as expected
-- [ ] All core CLI commands are functional
+### Story 3: Integration Points
+**As a [developer], I want to [action] so that [outcome]**
+
+- Acceptance criteria 1
+- Acceptance criteria 2
+
+## Clarification Questions (if needed)
+
+Run this for deeper analysis:
+```
+md clarify.claude.md --_project "{{ _project }}"
+```
+
+## Success Metrics
+- [ ] User can accomplish [key outcome]
+- [ ] Performance meets [criteria]
+- [ ] Edge case [X] handled gracefully
+- [ ] Documentation complete
 
 ## Out of Scope
-- GUI interface
-- Complex build processes
-- Non-markdown agent definitions
+- Feature X (why?)
+- Feature Y (why?)
+- Future: Feature Z
+
+---
+
+**Next Step**: Once requirements are clear, run:
+```bash
+md plan.claude.md --_project "{{ _project }}"
+```
+
+This specification will be imported by downstream agents.

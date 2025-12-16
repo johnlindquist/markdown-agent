@@ -1,86 +1,96 @@
 ---
 model: opus
+_project: "{{ _project | default: 'MyProject' }}"
+_task: "{{ _task | default: '1.1' }}"
+_interactive: true
 ---
 
-# Implementation: Execute the Plan
+# Implementation: {{ _project }} - Task {{ _task }}
 
-Execute all tasks to build the feature according to the plan.
+Guide for executing individual tasks or all tasks in sequence.
 
-## Pre-Implementation Checklist
-- [ ] Constitution established and agreed upon
-- [ ] Specification reviewed and approved
-- [ ] Technical plan validated
-- [ ] Task breakdown accepted
-- [ ] Team understanding confirmed
+**Task Reference**: @./tasks.claude.md  
+**All Specs**: @./plan.claude.md  
+**Mode**: Interactive - ask questions as you work
 
-## Execution Instructions
-
-### Step 1: Validate Prerequisites
-```bash
-# Ensure development environment is ready
-bun --version
-git status
+## Pre-Work Checklist
+```
+!git status
+!npm test 2>&1 | head -20
+!git branch
 ```
 
-### Step 2: Execute Phase 1 (Core Infrastructure)
-Process Task 1.1, 1.2, 1.3 sequentially:
-- Create type definitions
-- Implement parser
-- Set up build configuration
+## Current Task: {{ _task }}
 
-### Step 3: Execute Phase 2 (Configuration & Templating)
-Process Task 2.1, 2.2, 2.3:
-- Build configuration loader
-- Integrate LiquidJS templates
-- Add environment handling
+### Context
+Review the task definition from tasks.claude.md:
+@./tasks.claude.md
 
-### Step 4: Execute Phase 3 (Import System)
-Process Task 3.1, 3.2, 3.3:
-- File import parser
-- Glob support with filtering
-- Command output injection
+### Implementation Steps
 
-### Step 5: Execute Phase 4 (Command Execution)
-Process Task 4.1, 4.2, 4.3:
-- Command resolution logic
-- CLI argument building
-- Process execution and streaming
+1. **Understand the requirements**
+   - What needs to be built?
+   - What are the acceptance criteria?
+   - What files will be affected?
 
-### Step 6: Execute Phase 5 (History & State)
-Process Task 5.1, 5.2:
-- Frecency tracking system
-- Variable persistence and recall
+2. **Write tests first** (TDD)
+   ```bash
+   npm test -- --watch
+   ```
 
-### Step 7: Execute Phase 6 (CLI & Logging)
-Process Task 6.1, 6.2:
-- Pino logging setup
-- CLI command interface
+3. **Implement incrementally**
+   - Small, reviewable commits
+   - Test frequently
+   - Run linter: `!npm run lint`
 
-### Step 8: Execute Phase 7 (Testing & Documentation)
-Process Task 7.1, 7.2, 7.3:
-- Unit test suite
-- Integration tests
-- Complete documentation
+4. **Validate implementation**
+   ```bash
+   !npm test
+   !npm run lint
+   !npm run build
+   ```
 
-## Validation Gates
+5. **Document changes**
+   - Update README if needed
+   - Add inline comments
+   - Update CHANGELOG.md
 
-After each phase, verify:
-- ✓ Code compiles without errors
-- ✓ Existing tests still pass
-- ✓ New functionality works as specified
-- ✓ Documentation is updated
-- ✓ Examples reflect new features
+## Parallel Tasks (if running multiple agents)
 
-## Rollout Plan
-1. Merge to main branch
-2. Tag release version
-3. Run smoke tests on all platforms
-4. Update CHANGELOG.md
-5. Publish release notes
+Run task analysis in parallel:
+```
+md implement.claude.md --_project "{{ _project }}" --_task "1.1" | tee task-1.1-notes.md
+md implement.claude.md --_project "{{ _project }}" --_task "1.2" | tee task-1.2-notes.md
+```
 
-## Success Criteria
-- All phases completed as planned
-- Test coverage above 80%
-- All CLI commands functional
-- Documentation comprehensive
-- No breaking changes to existing API
+## Integration After Task Completion
+
+Once task is done:
+```bash
+git add -A
+git commit -m "feat: implement task {{ _task }}"
+!npm test
+```
+
+## When Stuck
+
+Ask for help or clarification:
+```bash
+md help.claude.md --_question "How do I handle [specific issue]?"
+```
+
+---
+
+**Quick Commands**:
+```bash
+# Run just this task
+md implement.claude.md --_project "{{ _project }}" --_task "{{ _task }}"
+
+# Watch tests
+!npm test -- --watch
+
+# Run full suite
+!npm test && npm run lint && npm run build
+```
+
+**Next Task**: Update tasks.claude.md when this task is complete.
