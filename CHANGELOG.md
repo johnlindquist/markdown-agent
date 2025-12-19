@@ -1,3 +1,10 @@
+## [2.35.4](https://github.com/johnlindquist/mdflow/compare/v2.35.3...v2.35.4) (2025-12-19)
+
+
+### Bug Fixes
+
+* split comma-separated values for variadic flags ([5d394c8](https://github.com/johnlindquist/mdflow/commit/5d394c83ddfb9935858fa6f016bbb99f2604f59f))
+
 ## [2.35.3](https://github.com/johnlindquist/mdflow/compare/v2.35.2...v2.35.3) (2025-12-19)
 
 
